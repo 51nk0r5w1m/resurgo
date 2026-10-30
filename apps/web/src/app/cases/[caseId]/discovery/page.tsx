@@ -58,6 +58,7 @@ export default async function DiscoveryPage({
         initialAnswers={state.answers as Record<string, string>}
         initialRecommendations={state.recommendations}
         initialRoadmap={state.roadmap}
+        initialStatus={state.session.status}
         questions={discoveryQuestions.map((question) => ({
           key: question.key,
           prompt: question.prompt,
