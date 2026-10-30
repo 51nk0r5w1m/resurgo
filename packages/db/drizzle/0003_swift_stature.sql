@@ -1,0 +1,2 @@
+ALTER TABLE "resurgo"."resource_grants" DROP CONSTRAINT "resource_grants_scope_unique";--> statement-breakpoint
+CREATE UNIQUE INDEX "resource_grants_active_scope_unique" ON "resurgo"."resource_grants" USING btree ("resource_id","grantee_case_membership_id","operation","basis") WHERE "resurgo"."resource_grants"."status" = 'active';

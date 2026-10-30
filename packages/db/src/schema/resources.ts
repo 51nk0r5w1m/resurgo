@@ -7,6 +7,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -151,12 +152,14 @@ export const resourceGrants = resurgoSchema.table(
       .notNull(),
   },
   (table) => [
-    unique("resource_grants_scope_unique").on(
-      table.resourceId,
-      table.granteeCaseMembershipId,
-      table.operation,
-      table.basis,
-    ),
+    uniqueIndex("resource_grants_active_scope_unique")
+      .on(
+        table.resourceId,
+        table.granteeCaseMembershipId,
+        table.operation,
+        table.basis,
+      )
+      .where(sql`${table.status} = 'active'`),
     index("resource_grants_grantee_status_idx").on(
       table.granteeCaseMembershipId,
       table.status,

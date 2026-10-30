@@ -10,4 +10,5 @@ export function createDatabase(databaseUrl: string) {
 }
 
 export * from "./domain/cases";
+export * from "./domain/authorization";
 export * from "./schema";

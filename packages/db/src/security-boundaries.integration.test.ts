@@ -7,6 +7,10 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
+import {
+  hasEffectiveCaseAccess,
+  hasEffectiveResourceAccess,
+} from "./domain/authorization";
 import { createCaseWithOwner } from "./domain/cases";
 import * as schema from "./schema";
 
@@ -138,6 +142,29 @@ describe("case and professional security boundaries", () => {
       status: "active",
       userId: owner.id,
     });
+
+    const persisted = await database
+      .select({
+        caseId: schema.cases.id,
+        membershipStatus: schema.caseMemberships.status,
+        membershipUserId: schema.caseMemberships.userId,
+      })
+      .from(schema.cases)
+      .innerJoin(
+        schema.caseMemberships,
+        and(
+          eq(schema.caseMemberships.caseId, schema.cases.id),
+          eq(schema.caseMemberships.role, "owner"),
+        ),
+      )
+      .where(eq(schema.cases.id, result.case.id));
+    expect(persisted).toEqual([
+      {
+        caseId: result.case.id,
+        membershipStatus: "active",
+        membershipUserId: owner.id,
+      },
+    ]);
   });
 
   test("rejects a case that commits without an active owner membership", async () => {
@@ -317,6 +344,228 @@ describe("case and professional security boundaries", () => {
 
     expect(lenderOneGrants).toEqual([{ resourceId: resource.id }]);
     expect(lenderTwoGrants).toEqual([]);
+    await expect(
+      hasEffectiveResourceAccess(database, {
+        caseId: clientCase.id,
+        operation: "view",
+        resourceId: resource.id,
+        userId: lenderOne.id,
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      hasEffectiveResourceAccess(database, {
+        caseId: clientCase.id,
+        operation: "view",
+        resourceId: resource.id,
+        userId: lenderTwo.id,
+      }),
+    ).resolves.toBe(false);
+  });
+
+  test("invalidates professional access when organization, membership, or consent becomes ineffective", async () => {
+    const owner = await createSyntheticUser("lifecycle-owner");
+    const professional = await createSyntheticUser("lifecycle-professional");
+    const { case: clientCase, ownerMembership } = await createCaseWithOwner(
+      database,
+      { jurisdictionCode: "GA-FULTON-SUPERIOR", ownerUserId: owner.id },
+    );
+    const organization = await createVerifiedOrganization(
+      "Synthetic Lifecycle Mortgage Provider",
+      "lender",
+      owner.id,
+    );
+    const organizationMembership = await createProfessionalMembership(
+      professional.id,
+      organization.id,
+    );
+    const [caseMembership] = await database
+      .insert(schema.caseMemberships)
+      .values({
+        caseId: clientCase.id,
+        organizationMembershipId: organizationMembership.id,
+        role: "lender",
+        status: "active",
+        userId: professional.id,
+        validFrom: new Date(),
+      })
+      .returning();
+    const [resource] = await database
+      .insert(schema.caseResources)
+      .values({
+        caseId: clientCase.id,
+        classification: "financial",
+        ownerCaseMembershipId: ownerMembership.id,
+        type: "document",
+      })
+      .returning();
+    if (!caseMembership || !resource) {
+      throw new Error("Professional access fixture was not created");
+    }
+    const [consent] = await database
+      .insert(schema.disclosureConsents)
+      .values({
+        caseId: clientCase.id,
+        classification: "financial",
+        grantorCaseMembershipId: ownerMembership.id,
+        operation: "view",
+        purpose: "Synthetic lifecycle review",
+        recipientCaseMembershipId: caseMembership.id,
+        termsHash: "e".repeat(64),
+      })
+      .returning();
+    if (!consent) throw new Error("Consent fixture was not created");
+    await database.insert(schema.resourceGrants).values({
+      basis: "explicit_consent",
+      caseId: clientCase.id,
+      classification: "financial",
+      granteeCaseMembershipId: caseMembership.id,
+      operation: "view",
+      resourceId: resource.id,
+      sourceConsentId: consent.id,
+    });
+
+    const caseDecision = () =>
+      hasEffectiveCaseAccess(database, {
+        caseId: clientCase.id,
+        userId: professional.id,
+      });
+    const resourceDecision = () =>
+      hasEffectiveResourceAccess(database, {
+        caseId: clientCase.id,
+        operation: "view",
+        resourceId: resource.id,
+        userId: professional.id,
+      });
+
+    await expect(caseDecision()).resolves.toBe(true);
+    await expect(resourceDecision()).resolves.toBe(true);
+
+    await database
+      .update(schema.organizations)
+      .set({ pilotStatus: "suspended" })
+      .where(eq(schema.organizations.id, organization.id));
+    await expect(caseDecision()).resolves.toBe(false);
+    await expect(resourceDecision()).resolves.toBe(false);
+
+    await database
+      .update(schema.organizations)
+      .set({ pilotStatus: "verified" })
+      .where(eq(schema.organizations.id, organization.id));
+    await expect(caseDecision()).resolves.toBe(true);
+
+    await database
+      .update(schema.disclosureConsents)
+      .set({ revokedAt: new Date(), status: "revoked" })
+      .where(eq(schema.disclosureConsents.id, consent.id));
+    await expect(resourceDecision()).resolves.toBe(false);
+
+    await database
+      .update(schema.organizationMemberships)
+      .set({ revokedAt: new Date(), status: "revoked" })
+      .where(eq(schema.organizationMemberships.id, organizationMembership.id));
+    await expect(caseDecision()).resolves.toBe(false);
+    await expect(resourceDecision()).resolves.toBe(false);
+  });
+
+  test("retains revoked and expired grant history while allowing a new grant", async () => {
+    const owner = await createSyntheticUser("regrant-owner");
+    const { case: clientCase, ownerMembership } = await createCaseWithOwner(
+      database,
+      { jurisdictionCode: "GA-DEKALB-SUPERIOR", ownerUserId: owner.id },
+    );
+    const [resource] = await database
+      .insert(schema.caseResources)
+      .values({
+        caseId: clientCase.id,
+        classification: "shared",
+        ownerCaseMembershipId: ownerMembership.id,
+        type: "roadmap_item",
+      })
+      .returning();
+    if (!resource) throw new Error("Regrant resource fixture was not created");
+
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const grantValues = {
+      basis: "case_owner" as const,
+      caseId: clientCase.id,
+      classification: "shared" as const,
+      granteeCaseMembershipId: ownerMembership.id,
+      operation: "view" as const,
+      resourceId: resource.id,
+    };
+    const [revokedGrant] = await database
+      .insert(schema.resourceGrants)
+      .values({ ...grantValues, effectiveAt: threeHoursAgo })
+      .returning();
+    if (!revokedGrant) throw new Error("Initial grant was not created");
+    await database
+      .update(schema.resourceGrants)
+      .set({ revokedAt: new Date(), status: "revoked" })
+      .where(eq(schema.resourceGrants.id, revokedGrant.id));
+    await expect(
+      hasEffectiveResourceAccess(database, {
+        caseId: clientCase.id,
+        operation: "view",
+        resourceId: resource.id,
+        userId: owner.id,
+      }),
+    ).resolves.toBe(false);
+
+    const [expiredGrant] = await database
+      .insert(schema.resourceGrants)
+      .values({ ...grantValues, effectiveAt: twoHoursAgo })
+      .returning();
+    if (!expiredGrant) throw new Error("Replacement grant was not created");
+    await database
+      .update(schema.resourceGrants)
+      .set({ expiresAt: oneHourAgo, status: "expired" })
+      .where(eq(schema.resourceGrants.id, expiredGrant.id));
+
+    await expect(
+      hasEffectiveResourceAccess(database, {
+        caseId: clientCase.id,
+        operation: "view",
+        resourceId: resource.id,
+        userId: owner.id,
+      }),
+    ).resolves.toBe(false);
+
+    const [activeGrant] = await database
+      .insert(schema.resourceGrants)
+      .values(grantValues)
+      .returning();
+    if (!activeGrant) throw new Error("Renewed grant was not created");
+    await expectDatabaseError(
+      database.insert(schema.resourceGrants).values(grantValues),
+      "23505",
+      "resource_grants_active_scope_unique",
+    );
+    await expect(
+      hasEffectiveResourceAccess(database, {
+        caseId: clientCase.id,
+        operation: "view",
+        resourceId: resource.id,
+        userId: owner.id,
+      }),
+    ).resolves.toBe(true);
+
+    const history = await database
+      .select({
+        id: schema.resourceGrants.id,
+        status: schema.resourceGrants.status,
+      })
+      .from(schema.resourceGrants)
+      .where(eq(schema.resourceGrants.resourceId, resource.id));
+    expect(history).toEqual(
+      expect.arrayContaining([
+        { id: revokedGrant.id, status: "revoked" },
+        { id: expiredGrant.id, status: "expired" },
+        { id: activeGrant.id, status: "active" },
+      ]),
+    );
+    expect(history).toHaveLength(3);
   });
 
   test("rejects cross-case resource and consent references", async () => {
@@ -367,6 +616,21 @@ describe("case and professional security boundaries", () => {
       "23503",
       "disclosure_consents_recipient_membership_fk",
     );
+
+    await expect(
+      hasEffectiveCaseAccess(database, {
+        caseId: first.case.id,
+        userId: secondOwner.id,
+      }),
+    ).resolves.toBe(false);
+    await expect(
+      hasEffectiveResourceAccess(database, {
+        caseId: first.case.id,
+        operation: "view",
+        resourceId: resource.id,
+        userId: secondOwner.id,
+      }),
+    ).resolves.toBe(false);
   });
 
   test("requires consent scope to match the grantee, classification, and operation", async () => {
