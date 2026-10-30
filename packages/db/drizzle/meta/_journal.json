@@ -29,6 +29,13 @@
       "when": 1793340038774,
       "tag": "0003_swift_stature",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793340464006,
+      "tag": "0004_enforce_owner_grants",
+      "breakpoints": true
     }
   ]
 }

@@ -137,6 +137,7 @@ try {
       "case_memberships_preserve_active_owner_check",
       "cases_enabled_pilot_jurisdiction_check",
       "cases_active_owner_membership_check",
+      "resource_grants_case_owner_basis_check",
     ]) {
       if (!triggerNames.includes(expectedTrigger)) {
         throw new Error(

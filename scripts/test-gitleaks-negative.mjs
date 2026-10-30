@@ -14,6 +14,9 @@ function run(command, args) {
     encoding: "utf8",
   });
   if (result.error) throw result.error;
+  if (result.signal) {
+    throw new Error(`${command} terminated by signal ${result.signal}`);
+  }
   return result;
 }
 

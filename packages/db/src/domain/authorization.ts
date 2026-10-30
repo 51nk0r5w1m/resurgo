@@ -29,6 +29,8 @@ export async function hasEffectiveCaseAccess(
     select exists (
       select 1
       from resurgo.case_memberships as case_membership
+      inner join resurgo.cases as case_record
+        on case_record.id = case_membership.case_id
       left join resurgo.organization_memberships as organization_membership
         on organization_membership.id = case_membership.organization_membership_id
         and organization_membership.user_id = case_membership.user_id
@@ -36,6 +38,7 @@ export async function hasEffectiveCaseAccess(
         on organization.id = organization_membership.organization_id
       where case_membership.case_id = ${input.caseId}
         and case_membership.user_id = ${input.userId}
+        and case_record.status = 'active'
         and case_membership.status = 'active'
         and case_membership.valid_from <= ${evaluatedAt}
         and (case_membership.expires_at is null or case_membership.expires_at > ${evaluatedAt})
@@ -68,6 +71,8 @@ export async function hasEffectiveResourceAccess(
     select exists (
       select 1
       from resurgo.resource_grants as resource_grant
+      inner join resurgo.cases as case_record
+        on case_record.id = resource_grant.case_id
       inner join resurgo.case_memberships as case_membership
         on case_membership.case_id = resource_grant.case_id
         and case_membership.id = resource_grant.grantee_case_membership_id
@@ -85,6 +90,7 @@ export async function hasEffectiveResourceAccess(
       where resource_grant.case_id = ${input.caseId}
         and resource_grant.resource_id = ${input.resourceId}
         and resource_grant.operation = ${input.operation}
+        and case_record.status = 'active'
         and resource_grant.status = 'active'
         and resource_grant.effective_at <= ${evaluatedAt}
         and (resource_grant.expires_at is null or resource_grant.expires_at > ${evaluatedAt})
@@ -108,7 +114,12 @@ export async function hasEffectiveResourceAccess(
           )
         )
         and (
-          (resource_grant.basis = 'case_owner' and resource_grant.source_consent_id is null)
+          (
+            resource_grant.basis = 'case_owner'
+            and resource_grant.source_consent_id is null
+            and case_membership.role = 'owner'
+            and case_record.owner_user_id = case_membership.user_id
+          )
           or (
             resource_grant.basis = 'explicit_consent'
             and consent.status = 'active'

@@ -352,6 +352,25 @@ describe("case and professional security boundaries", () => {
         userId: lenderOne.id,
       }),
     ).resolves.toBe(true);
+
+    await database
+      .update(schema.cases)
+      .set({ status: "paused" })
+      .where(eq(schema.cases.id, clientCase.id));
+    await expect(
+      hasEffectiveCaseAccess(database, {
+        caseId: clientCase.id,
+        userId: owner.id,
+      }),
+    ).resolves.toBe(false);
+    await expect(
+      hasEffectiveResourceAccess(database, {
+        caseId: clientCase.id,
+        operation: "view",
+        resourceId: resource.id,
+        userId: lenderOne.id,
+      }),
+    ).resolves.toBe(false);
     await expect(
       hasEffectiveResourceAccess(database, {
         caseId: clientCase.id,
@@ -566,6 +585,49 @@ describe("case and professional security boundaries", () => {
       ]),
     );
     expect(history).toHaveLength(3);
+  });
+
+  test("rejects case-owner grant basis for a non-owner membership", async () => {
+    const owner = await createSyntheticUser("owner-basis-owner");
+    const collaborator = await createSyntheticUser("owner-basis-collaborator");
+    const { case: clientCase, ownerMembership } = await createCaseWithOwner(
+      database,
+      { jurisdictionCode: "GA-FULTON-SUPERIOR", ownerUserId: owner.id },
+    );
+    const [collaboratorMembership] = await database
+      .insert(schema.caseMemberships)
+      .values({
+        caseId: clientCase.id,
+        role: "co_client",
+        status: "active",
+        userId: collaborator.id,
+        validFrom: new Date(),
+      })
+      .returning();
+    const [resource] = await database
+      .insert(schema.caseResources)
+      .values({
+        caseId: clientCase.id,
+        classification: "shared",
+        ownerCaseMembershipId: ownerMembership.id,
+        type: "coordination_note",
+      })
+      .returning();
+    if (!collaboratorMembership || !resource) {
+      throw new Error("Owner-basis fixture was not created");
+    }
+
+    await expectDatabaseError(
+      database.insert(schema.resourceGrants).values({
+        basis: "case_owner",
+        caseId: clientCase.id,
+        classification: "shared",
+        granteeCaseMembershipId: collaboratorMembership.id,
+        operation: "view",
+        resourceId: resource.id,
+      }),
+      "23514",
+    );
   });
 
   test("rejects cross-case resource and consent references", async () => {
