@@ -21,12 +21,14 @@ export function DiscoveryInterview({
   initialAnswers,
   initialRecommendations,
   initialRoadmap,
+  initialStatus,
   questions,
 }: {
   caseId: string;
   initialAnswers: Record<string, string>;
   initialRecommendations: Recommendation[];
   initialRoadmap: RoadmapItem[];
+  initialStatus: "in_progress" | "completed";
   questions: Question[];
 }) {
   const [answers, setAnswers] = useState(initialAnswers);
@@ -34,6 +36,7 @@ export function DiscoveryInterview({
     initialRecommendations,
   );
   const [roadmap, setRoadmap] = useState(initialRoadmap);
+  const [status, setStatus] = useState(initialStatus);
   const [message, setMessage] = useState("");
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const visible = useMemo(
@@ -103,10 +106,11 @@ export function DiscoveryInterview({
     };
     setRecommendations(result.state.recommendations);
     setRoadmap(result.state.roadmap);
+    setStatus("completed");
     setMessage("Your personalized roadmap is ready.");
   }
 
-  if (roadmap.length > 0) {
+  if (status === "completed") {
     return (
       <div className="journey-results">
         <section>
