@@ -50,9 +50,58 @@ export default async function ReviewsPage({
     <main className="case-page">
       <CasePageHeader
         eyebrow="Professional Review Register"
-        summary="Each review remains tied to the exact evidence versions used. New evidence supersedes history rather than rewriting it."
-        title="Accountable professional review"
+        summary={
+          authorization.role === "lender"
+            ? "Review only the financial evidence the client authorized, record financing conditions, and distinguish feasibility from underwriting approval."
+            : authorization.role === "attorney"
+              ? "Review the findings the client authorized for disclosure without receiving the specialist's restricted source documents."
+              : "Each review remains tied to the exact evidence versions used. New evidence supersedes history rather than rewriting it."
+        }
+        title={
+          authorization.role === "lender"
+            ? "Evaluate the housing plan before settlement"
+            : authorization.role === "attorney"
+              ? "Connect financing findings to settlement terms"
+              : "Accountable professional review"
+        }
       />
+      {(authorization.role === "lender" ||
+        authorization.role === "attorney") && (
+        <section className="workspace-card professional-workflow-intro">
+          <div>
+            <p className="eyebrow">
+              {authorization.role === "lender"
+                ? "Assigned mortgage review"
+                : "Authorized findings review"}
+            </p>
+            <h2>
+              {authorization.role === "lender"
+                ? "A 90-day refinance deadline depends on unresolved financing conditions."
+                : "Financing conditions should be visible before settlement language is finalized."}
+            </h2>
+          </div>
+          {authorization.role === "lender" ? (
+            <ol>
+              <li>
+                Examine only the mortgage evidence disclosed for this review.
+              </li>
+              <li>
+                Record feasibility concerns and outstanding conditions below.
+              </li>
+              <li>
+                Submit findings without implying preapproval or underwriting
+                approval.
+              </li>
+            </ol>
+          ) : (
+            <ol>
+              <li>Read the client-authorized specialist findings.</li>
+              <li>Assess their effect on settlement language and timing.</li>
+              <li>Acknowledge the exact immutable review revision below.</li>
+            </ol>
+          )}
+        </section>
+      )}
       {authorization.role === "owner" && (
         <details className="workspace-card review-assignment-disclosure">
           <summary>

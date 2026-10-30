@@ -81,8 +81,18 @@ export default async function DashboardPage() {
                 : "DeKalb County"}
             </h2>
             <p>
-              <Link href={`/cases/${caseRecord.id}`}>
-                Open populated case workspace
+              <Link
+                href={
+                  caseRecord.role === "lender" || caseRecord.role === "attorney"
+                    ? `/cases/${caseRecord.id}/reviews`
+                    : `/cases/${caseRecord.id}`
+                }
+              >
+                {caseRecord.role === "lender"
+                  ? "Open assigned mortgage review"
+                  : caseRecord.role === "attorney"
+                    ? "Open authorized professional findings"
+                    : "Open populated case workspace"}
               </Link>
             </p>
           </article>

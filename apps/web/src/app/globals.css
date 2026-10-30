@@ -1049,6 +1049,26 @@ footer {
   margin: 1rem 0 0;
   padding: 0;
 }
+.professional-workflow-intro {
+  align-items: start;
+  background: linear-gradient(135deg, #e7efea, #fff9ed);
+  border-color: #b9cbc2;
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  margin-bottom: 1rem;
+}
+.professional-workflow-intro ol {
+  border-left: 1px solid #b9cbc2;
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0.15rem 0 0.15rem 2.25rem;
+}
+.professional-workflow-intro li {
+  line-height: 1.45;
+  padding-left: 0.25rem;
+}
 .review-register-list > li {
   padding: clamp(1.25rem, 3vw, 2rem);
 }
@@ -2076,5 +2096,13 @@ footer {
   }
   .settlement-review-summary dl {
     grid-template-columns: 1fr;
+  }
+  .professional-workflow-intro {
+    grid-template-columns: 1fr;
+  }
+  .professional-workflow-intro ol {
+    border-left: 0;
+    border-top: 1px solid #b9cbc2;
+    padding: 1rem 0 0 1.5rem;
   }
 }

@@ -1,5 +1,6 @@
 import { BlobWriter, TextReader, ZipWriter } from "@zip.js/zip.js";
-import { PDFDocument } from "pdf-lib";
+import { createCanvas } from "@napi-rs/canvas";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 
 import { documentObjectKeys } from "./keys";
@@ -9,6 +10,20 @@ import { validateDocumentStructure } from "./validation";
 async function syntheticPdf() {
   const document = await PDFDocument.create();
   document.addPage([300, 200]);
+  return document.save();
+}
+
+async function syntheticTextPdf() {
+  const document = await PDFDocument.create();
+  const font = await document.embedFont(StandardFonts.Helvetica);
+  const page = document.addPage([300, 200]);
+  page.drawText("Synthetic mortgage balance: $225,000", {
+    color: rgb(0, 0, 0),
+    font,
+    size: 16,
+    x: 20,
+    y: 100,
+  });
   return document.save();
 }
 
@@ -93,6 +108,46 @@ describe("document structural validation", () => {
 
     expect(parsed.getPageCount()).toBe(1);
     expect(preview.byteLength).toBeGreaterThan(0);
+  });
+
+  it("preserves standard-font text in a rasterized preview", async () => {
+    const preview = await createRasterizedPdfPreview(await syntheticTextPdf());
+    const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const loadingTask = getDocument({
+      data: preview.slice(),
+      disableFontFace: true,
+      isEvalSupported: false,
+    } as unknown as Parameters<typeof getDocument>[0]);
+    const parsed = await loadingTask.promise;
+    const page = await parsed.getPage(1);
+    const viewport = page.getViewport({ scale: 1 });
+    const canvas = createCanvas(
+      Math.ceil(viewport.width),
+      Math.ceil(viewport.height),
+    );
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({
+      canvas: canvas as never,
+      canvasContext: context as never,
+      viewport,
+    }).promise;
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let darkPixels = 0;
+    for (let offset = 0; offset < pixels.length; offset += 4) {
+      if (
+        pixels[offset]! < 220 ||
+        pixels[offset + 1]! < 220 ||
+        pixels[offset + 2]! < 220
+      ) {
+        darkPixels += 1;
+      }
+    }
+    page.cleanup();
+    await loadingTask.destroy();
+
+    expect(darkPixels).toBeGreaterThan(100);
   });
 
   it("rejects a preview before allocating beyond the pixel budget", async () => {

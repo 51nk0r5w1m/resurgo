@@ -1,7 +1,14 @@
 import { createCanvas, DOMMatrix, ImageData, Path2D } from "@napi-rs/canvas";
+import { createRequire } from "node:module";
+import { dirname, resolve } from "node:path";
 import { PDFDocument } from "pdf-lib";
 
 Object.assign(globalThis, { DOMMatrix, ImageData, Path2D });
+const packageRequire = createRequire(import.meta.url);
+const standardFontDataUrl = `${resolve(
+  dirname(packageRequire.resolve("pdfjs-dist/package.json")),
+  "standard_fonts",
+)}/`;
 
 export async function createRasterizedPdfPreview(
   source: Uint8Array,
@@ -19,6 +26,7 @@ export async function createRasterizedPdfPreview(
     disableRange: true,
     disableStream: true,
     isEvalSupported: false,
+    standardFontDataUrl,
     stopAtErrors: true,
     useSystemFonts: false,
   } as unknown as Parameters<typeof getDocument>[0]);

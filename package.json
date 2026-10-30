@@ -16,8 +16,12 @@
     "db:migrate": "dotenv -e .env -- pnpm --filter @resurgo/db exec drizzle-kit migrate",
     "db:validate": "dotenv -e .env -- pnpm --filter @resurgo/db exec node scripts/validate-migrations.mjs",
     "demo:seed": "dotenv -e .env -- pnpm --filter @resurgo/web exec tsx scripts/seed-demo.ts",
-    "demo:reset": "dotenv -e .env -- pnpm --filter @resurgo/db exec node scripts/reset-demo.mjs --confirm-local-data-loss && pnpm db:migrate && pnpm demo:seed",
+    "demo:reset": "dotenv -e .env -- pnpm --filter @resurgo/web exec tsx scripts/reset-demo.ts && pnpm demo:seed",
     "demo:code": "pnpm --filter @resurgo/web exec node scripts/demo-code.mjs",
+    "demo:rotate-credential": "pnpm --filter @resurgo/web exec node scripts/rotate-demo-credential.mjs",
+    "demo:external:init": "node scripts/init-external-demo.mjs",
+    "demo:external:start": "node scripts/start-external-demo.mjs",
+    "demo:external:stop": "node scripts/stop-external-demo.mjs",
     "dev": "dotenv -e .env -- pnpm --filter @resurgo/web dev",
     "env:check": "node scripts/check-env.mjs",
     "env:init": "node scripts/init-env.mjs",
@@ -32,7 +36,9 @@
     "test": "vitest run",
     "test:integration": "dotenv -e .env -- vitest run --config vitest.integration.config.ts",
     "test:postgres-persistence": "node scripts/test-postgres-persistence.mjs",
+    "test:demo-reset-isolation": "dotenv -e .env -- node scripts/test-demo-reset-isolation.mjs",
     "test:e2e": "dotenv -e .env -- playwright test",
+    "test:e2e:external": "playwright test --config playwright.external.config.ts",
     "typecheck": "pnpm --recursive --if-present typecheck"
   },
   "devDependencies": {

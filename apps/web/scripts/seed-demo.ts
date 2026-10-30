@@ -61,6 +61,7 @@ const auth = createResurgoAuth({
   emailSender: async (message) => {
     messages.push(message);
   },
+  rateLimitEnabled: false,
   secret: environment.BETTER_AUTH_SECRET,
   secureCookies: false,
 });

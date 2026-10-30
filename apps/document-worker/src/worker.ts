@@ -17,6 +17,7 @@ type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 type WorkItem = {
   caseId: string;
+  claimedAt: Date;
   contentHash: string;
   documentId: string;
   mimeType: string;
@@ -49,14 +50,17 @@ async function claim(transaction: Transaction): Promise<WorkItem | undefined> {
   `);
   const row = result.rows[0];
   if (!row) return undefined;
+  const claimedAt = new Date();
   await transaction.insert(documentProcessingEvents).values({
     caseId: row.case_id,
     documentId: row.document_id,
     documentVersionId: row.id,
+    occurredAt: claimedAt,
     status: "processing",
   });
   return {
     caseId: row.case_id,
+    claimedAt,
     contentHash: row.content_hash,
     documentId: row.document_id,
     mimeType: row.mime_type,
@@ -89,6 +93,9 @@ export async function processNextDocument(input: {
         caseId: item.caseId,
         documentId: item.documentId,
         documentVersionId: item.versionId,
+        occurredAt: new Date(
+          Math.max(Date.now(), item.claimedAt.getTime() + 1),
+        ),
         status: "available",
       });
       await transaction.insert(auditEvents).values(
@@ -111,6 +118,9 @@ export async function processNextDocument(input: {
             documentId: item.documentId,
             documentVersionId: item.versionId,
             failureCode: error.failureCode,
+            occurredAt: new Date(
+              Math.max(Date.now(), item.claimedAt.getTime() + 1),
+            ),
             status: "rejected",
           });
           await transaction.insert(auditEvents).values(

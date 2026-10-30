@@ -4,7 +4,7 @@ tunnel: REPLACE_WITH_TUNNEL_UUID
 credentials-file: /home/REPLACE/.cloudflared/REPLACE_WITH_TUNNEL_UUID.json
 
 ingress:
-  - hostname: demo.example.com
+  - hostname: demo.5o5.sh
     service: http://127.0.0.1:3000
     originRequest:
       noTLSVerify: false

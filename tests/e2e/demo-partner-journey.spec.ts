@@ -60,11 +60,11 @@ async function login(browser: Browser, account: DemoAccount) {
 
 async function casePath(page: Page) {
   const href = await page
-    .getByRole("link", { name: "Open populated case workspace" })
+    .locator('a[href^="/cases/"]')
     .first()
     .getAttribute("href");
   if (!href) throw new Error("Synthetic demo case link missing");
-  return href;
+  return href.replace(/\/reviews$/u, "");
 }
 
 test("three independent accounts demonstrate settlement feasibility coordination", async ({

@@ -26,10 +26,11 @@ pnpm demo:code attorney
 pnpm demo:code lender
 ```
 
-`pnpm demo:seed` is idempotent. To rebuild the demonstration from an empty
-local database, run `pnpm demo:reset`. This guarded command refuses production
-or non-loopback database hosts and deletes all data in the local Resurgo
-database schemas before migrating and reseeding.
+`pnpm demo:seed` is idempotent. To rebuild only the fictional demonstration,
+run `pnpm demo:reset`. This guarded command refuses production or non-loopback
+database hosts, removes only the three known demo identities, their case graph,
+their two fictional organizations, and their exact object-storage keys, then
+reseeds them. Unrelated development cases are retained.
 
 ## Private Cloudflare Tunnel (requires owner configuration)
 
