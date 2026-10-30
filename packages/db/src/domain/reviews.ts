@@ -485,64 +485,66 @@ export async function invalidateReviewsForEvidenceChange(
     supersededDocumentVersionId: string;
   },
 ) {
-  const result = await database.execute<{
-    decision_context: string;
-    professional_review_id: string;
-    review_scope: string;
-    revision: number;
-    revision_id: string;
-  }>(sql`
-    select review.id as professional_review_id,
-      revision.id as revision_id, revision.revision,
-      revision.decision_context, revision.review_scope
-    from resurgo.professional_reviews review
-    inner join resurgo.professional_review_revisions revision
-      on revision.case_id = review.case_id
-      and revision.professional_review_id = review.id
-    inner join resurgo.professional_review_evidence evidence
-      on evidence.case_id = revision.case_id
-      and evidence.professional_review_id = revision.professional_review_id
-      and evidence.review_revision_id = revision.id
-    where review.case_id = ${input.caseId}
-      and evidence.document_version_id = ${input.supersededDocumentVersionId}
-      and revision.status in ('assigned', 'in_progress', 'clarification_required', 'completed')
-      and not exists (
-        select 1 from resurgo.professional_review_revisions newer
-        where newer.case_id = revision.case_id
-          and newer.professional_review_id = revision.professional_review_id
-          and newer.revision > revision.revision
-      )
-    for update of revision
-  `);
-  for (const current of result.rows) {
-    const [invalidated] = await database
-      .insert(professionalReviewRevisions)
-      .values({
-        caseId: input.caseId,
-        createdByCaseMembershipId: input.actorCaseMembershipId,
-        decisionContext: current.decision_context,
-        professionalReviewId: current.professional_review_id,
-        reviewScope: current.review_scope,
-        revision: current.revision + 1,
-        status: "superseded",
-        supersedesRevisionId: current.revision_id,
-      })
-      .returning({ id: professionalReviewRevisions.id });
-    if (!invalidated) throw new Error("Review invalidation failed");
-    await database.insert(auditEvents).values(
-      buildAuditEvent({
-        action: "professional_review.evidence_superseded",
-        actorType: "user",
-        actorUserId: input.actorUserId,
-        caseId: input.caseId,
-        outcome: "success",
-        reasonCode: "document_version_superseded",
-        resourceId: current.professional_review_id,
-        resourceType: "professional_review",
-      }),
-    );
-  }
-  return result.rows.length;
+  return database.transaction(async (transaction) => {
+    const result = await transaction.execute<{
+      decision_context: string;
+      professional_review_id: string;
+      review_scope: string;
+      revision: number;
+      revision_id: string;
+    }>(sql`
+      select review.id as professional_review_id,
+        revision.id as revision_id, revision.revision,
+        revision.decision_context, revision.review_scope
+      from resurgo.professional_reviews review
+      inner join resurgo.professional_review_revisions revision
+        on revision.case_id = review.case_id
+        and revision.professional_review_id = review.id
+      inner join resurgo.professional_review_evidence evidence
+        on evidence.case_id = revision.case_id
+        and evidence.professional_review_id = revision.professional_review_id
+        and evidence.review_revision_id = revision.id
+      where review.case_id = ${input.caseId}
+        and evidence.document_version_id = ${input.supersededDocumentVersionId}
+        and revision.status in ('assigned', 'in_progress', 'clarification_required', 'completed')
+        and not exists (
+          select 1 from resurgo.professional_review_revisions newer
+          where newer.case_id = revision.case_id
+            and newer.professional_review_id = revision.professional_review_id
+            and newer.revision > revision.revision
+        )
+      for update of revision
+    `);
+    for (const current of result.rows) {
+      const [invalidated] = await transaction
+        .insert(professionalReviewRevisions)
+        .values({
+          caseId: input.caseId,
+          createdByCaseMembershipId: input.actorCaseMembershipId,
+          decisionContext: current.decision_context,
+          professionalReviewId: current.professional_review_id,
+          reviewScope: current.review_scope,
+          revision: current.revision + 1,
+          status: "superseded",
+          supersedesRevisionId: current.revision_id,
+        })
+        .returning({ id: professionalReviewRevisions.id });
+      if (!invalidated) throw new Error("Review invalidation failed");
+      await transaction.insert(auditEvents).values(
+        buildAuditEvent({
+          action: "professional_review.evidence_superseded",
+          actorType: "user",
+          actorUserId: input.actorUserId,
+          caseId: input.caseId,
+          outcome: "success",
+          reasonCode: "document_version_superseded",
+          resourceId: current.professional_review_id,
+          resourceType: "professional_review",
+        }),
+      );
+    }
+    return result.rows.length;
+  });
 }
 
 export async function listAuthorizedProfessionalReviews(
