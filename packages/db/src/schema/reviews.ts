@@ -278,8 +278,16 @@ export const professionalReviewAcknowledgements = resurgoSchema.table(
       name: "professional_review_acknowledgements_revision_fk",
     }).onDelete("restrict"),
     foreignKey({
-      columns: [table.caseId, table.attorneyCaseMembershipId],
-      foreignColumns: [caseMemberships.caseId, caseMemberships.id],
+      columns: [
+      table.caseId,
+      table.attorneyCaseMembershipId,
+      table.attorneyCaseMembershipRole,
+    ],
+    foreignColumns: [
+      caseMemberships.caseId,
+      caseMemberships.id,
+      caseMemberships.role,
+    ],
       name: "professional_review_acknowledgements_attorney_fk",
     }).onDelete("restrict"),
     check(
