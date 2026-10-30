@@ -23,6 +23,9 @@ export const discoverySessions = resurgoSchema.table(
       .notNull()
       .references(() => cases.id, { onDelete: "restrict" }),
     status: discoveryStatus("status").default("in_progress").notNull(),
+    definitionVersion: text("definition_version")
+      .default("atlanta-pilot-2026.1")
+      .notNull(),
     revision: integer("revision").default(0).notNull(),
     completedAt: timestamp("completed_at", {
       mode: "date",
@@ -54,6 +57,16 @@ export const discoveryAnswers = resurgoSchema.table(
       .references(() => discoverySessions.id, { onDelete: "restrict" }),
     questionKey: text("question_key").notNull(),
     answer: jsonb("answer").notNull(),
+    definitionVersion: text("definition_version")
+      .default("atlanta-pilot-2026.1")
+      .notNull(),
+    answerStatus: text("answer_status").default("answered").notNull(),
+    source: text("source").default("client_reported").notNull(),
+    verificationStatus: text("verification_status")
+      .default("unverified")
+      .notNull(),
+    classification: text("classification").default("shared").notNull(),
+    documentVersionId: uuid("document_version_id"),
     revision: integer("revision").notNull(),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
@@ -71,8 +84,72 @@ export const discoveryAnswers = resurgoSchema.table(
     ),
     check(
       "discovery_answers_question_key_check",
-      sql`${table.questionKey} in ('property_status', 'mortgage_status', 'financial_complexity', 'support_interest')`,
+      sql`length(${table.questionKey}) between 1 and 120 and ${table.questionKey} ~ '^[a-z][a-z0-9_]*$'`,
     ),
+    check(
+      "discovery_answers_status_check",
+      sql`${table.answerStatus} in ('answered', 'unknown', 'not_applicable', 'deferred')`,
+    ),
+    check(
+      "discovery_answers_source_check",
+      sql`${table.source} in ('client_reported', 'document_reported', 'professional_reported')`,
+    ),
+    check(
+      "discovery_answers_verification_check",
+      sql`${table.verificationStatus} in ('unverified', 'client_confirmed', 'document_verified', 'professional_reviewed')`,
+    ),
+    check(
+      "discovery_answers_classification_check",
+      sql`${table.classification} in ('shared', 'legal', 'financial', 'health')`,
+    ),
+  ],
+);
+
+export const discoveryOutputs = resurgoSchema.table(
+  "discovery_outputs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => cases.id, { onDelete: "restrict" }),
+    discoverySessionId: uuid("discovery_session_id")
+      .notNull()
+      .references(() => discoverySessions.id, { onDelete: "restrict" }),
+    generation: integer("generation").notNull(),
+    type: text("type").notNull(),
+    code: text("code").notNull(),
+    title: text("title").notNull(),
+    explanation: text("explanation").notNull(),
+    classification: text("classification").notNull(),
+    ruleId: text("rule_id").notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("discovery_outputs_id_case_unique").on(table.id, table.caseId),
+    unique("discovery_outputs_session_generation_code_unique").on(
+      table.discoverySessionId,
+      table.generation,
+      table.code,
+    ),
+    index("discovery_outputs_case_generation_idx").on(
+      table.caseId,
+      table.generation,
+    ),
+    check(
+      "discovery_outputs_type_check",
+      sql`${table.type} in ('document_request', 'review_trigger')`,
+    ),
+    check(
+      "discovery_outputs_classification_check",
+      sql`${table.classification} in ('shared', 'legal', 'financial', 'health')`,
+    ),
+    foreignKey({
+      columns: [table.discoverySessionId, table.caseId],
+      foreignColumns: [discoverySessions.id, discoverySessions.caseId],
+      name: "discovery_outputs_session_case_fk",
+    }).onDelete("restrict"),
   ],
 );
 
@@ -120,9 +197,11 @@ export const roadmapItems = resurgoSchema.table(
     caseId: uuid("case_id")
       .notNull()
       .references(() => cases.id, { onDelete: "restrict" }),
-    recommendationId: uuid("recommendation_id")
-      .notNull()
-      .references(() => recommendations.id, { onDelete: "restrict" }),
+    recommendationId: uuid("recommendation_id").references(
+      () => recommendations.id,
+      { onDelete: "restrict" },
+    ),
+    sourceDiscoveryOutputId: uuid("source_discovery_output_id"),
     generation: integer("generation").notNull(),
     position: integer("position").notNull(),
     title: text("title").notNull(),
@@ -142,6 +221,11 @@ export const roadmapItems = resurgoSchema.table(
       columns: [table.recommendationId, table.caseId],
       foreignColumns: [recommendations.id, recommendations.caseId],
       name: "roadmap_items_recommendation_case_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.sourceDiscoveryOutputId, table.caseId],
+      foreignColumns: [discoveryOutputs.id, discoveryOutputs.caseId],
+      name: "roadmap_items_discovery_output_case_fk",
     }).onDelete("restrict"),
     index("roadmap_items_case_generation_idx").on(
       table.caseId,

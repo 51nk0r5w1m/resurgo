@@ -1,0 +1,2 @@
+ALTER TABLE "resurgo"."professional_review_acknowledgements" ADD COLUMN "note" text;--> statement-breakpoint
+ALTER TABLE "resurgo"."professional_review_acknowledgements" ADD CONSTRAINT "professional_review_acknowledgements_note_check" CHECK ("resurgo"."professional_review_acknowledgements"."note" is null or length(trim("resurgo"."professional_review_acknowledgements"."note")) between 3 and 4000);

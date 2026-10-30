@@ -77,6 +77,10 @@ jobs:
         run: pnpm typecheck
       - name: Run unit tests
         run: pnpm test
+      - name: Start private document security services
+        run: |
+          pnpm env:init
+          docker compose --env-file .env -f infra/compose/compose.yaml up --detach --wait garage clamav
       - name: Validate migrations on an empty database
         run: pnpm db:validate
       - name: Apply migrations for integration tests
@@ -87,10 +91,23 @@ jobs:
         run: pnpm test:postgres-persistence
       - name: Build application
         run: pnpm build
+      - name: Seed the deterministic design-partner demonstration
+        run: pnpm demo:seed
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Run browser tests
-        run: pnpm test:e2e
+        run: |
+          pnpm --filter @resurgo/document-worker start > "${RUNNER_TEMP}/document-worker.log" 2>&1 &
+          document_worker_pid=$!
+          cleanup() {
+            kill "${document_worker_pid}" 2>/dev/null || true
+            wait "${document_worker_pid}" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          pnpm test:e2e || {
+            cat "${RUNNER_TEMP}/document-worker.log"
+            exit 1
+          }
       - name: Audit dependencies
         run: pnpm audit --audit-level moderate
 

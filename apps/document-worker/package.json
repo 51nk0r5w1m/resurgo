@@ -1,0 +1,23 @@
+{
+  "name": "@resurgo/document-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@resurgo/config": "workspace:*",
+    "@resurgo/db": "workspace:*",
+    "@resurgo/documents": "workspace:*",
+    "drizzle-orm": "0.45.4",
+    "tsx": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "@types/pg": "catalog:",
+    "pg": "catalog:",
+    "typescript": "5.9.3"
+  }
+}

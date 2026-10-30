@@ -19,8 +19,20 @@ allowBuilds:
 
 catalog:
   "@better-auth/drizzle-adapter": 1.7.14
+  "@fastify/busboy": 3.2.4
+  "@napi-rs/canvas": 1.0.13
   "@resurgo/db": workspace:*
+  "@resurgo/documents": workspace:*
   "@types/nodemailer": 7.0.11
+  "@types/pg": 8.23.1
   better-auth: 1.7.14
+  docxodus: 12.6.2
+  docx: 9.15.0
+  fast-xml-parser: 5.11.2
   nodemailer: 10.3.1
+  pdf-lib: 1.17.1
+  pdfjs-dist: 6.4.299
+  pg: 8.23.1
+  react-docxodus-viewer: 0.7.0
+  tsx: 4.23.15
   zod: 4.6.7

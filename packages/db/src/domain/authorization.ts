@@ -16,7 +16,7 @@ export interface CaseAccessInput {
 }
 
 export interface ResourceAccessInput extends CaseAccessInput {
-  operation: "view" | "download" | "share";
+  operation: "view" | "download" | "share" | "contribute";
   resourceId: string;
 }
 
@@ -110,8 +110,9 @@ export async function decideCaseAuthorization(
       case_membership.id
   `);
   // The schema prevents duplicate user/case memberships. Still evaluate every
-  // candidate so an eligible membership wins if historical data predates that
-  // constraint or the lifecycle model later permits retained history rows.
+  // returned candidate so authorization remains deterministic if legacy data
+  // predates that constraint or a future lifecycle model permits history rows.
+  // An eligible membership always wins over an ineligible historical row.
   const row =
     result.rows.find(
       (candidate) =>

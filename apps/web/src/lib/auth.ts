@@ -4,6 +4,7 @@ import { parseEnvironment } from "@resurgo/config";
 import { createDatabase } from "@resurgo/db";
 
 import { createResurgoAuth } from "./auth-factory";
+import { trustedAuthenticationOrigins } from "./auth-origins";
 import { classifyAuthenticationResponse, recordAuthEvent } from "./auth-audit";
 import { createSmtpEmailSender } from "./email";
 
@@ -30,6 +31,9 @@ function getRuntime() {
       }),
       secret: environment.BETTER_AUTH_SECRET,
       secureCookies: environment.NODE_ENV === "production",
+      trustedOrigins: trustedAuthenticationOrigins(
+        environment.NEXT_PUBLIC_APP_URL,
+      ),
     }),
   };
   return runtime;

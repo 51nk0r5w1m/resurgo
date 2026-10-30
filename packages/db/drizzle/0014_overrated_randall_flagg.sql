@@ -1,0 +1,1 @@
+ALTER TABLE "resurgo"."roadmap_items" ALTER COLUMN "recommendation_id" DROP NOT NULL;

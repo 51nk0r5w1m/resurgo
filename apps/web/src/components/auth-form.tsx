@@ -13,9 +13,11 @@ const genericRecoveryMessage =
 
 export function AuthForm({
   mode,
+  registrationEnabled = true,
   resetToken,
 }: {
   mode: Mode;
+  registrationEnabled?: boolean;
   resetToken?: string | undefined;
 }) {
   const router = useRouter();
@@ -147,7 +149,9 @@ export function AuthForm({
         {mode === "login" ? (
           <>
             <Link href="/forgot-password">Forgot password?</Link>
-            <Link href="/register">Create an account</Link>
+            {registrationEnabled && (
+              <Link href="/register">Create an account</Link>
+            )}
           </>
         ) : (
           <Link href="/login">Return to sign in</Link>
