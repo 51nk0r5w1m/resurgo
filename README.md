@@ -1,6 +1,6 @@
 # Resurgo
 
-**Navigate today. Build tomorrow.**
+`Navigate today. Build tomorrow.`
 
 ![Resurgo Platform Wireframes](docs/brand/resurgo-wireframes.png)
 
