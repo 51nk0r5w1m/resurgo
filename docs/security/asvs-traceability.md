@@ -47,14 +47,14 @@ requirement, not by itself a claim that the requirement or ASVS level is verifie
 No requirement is marked verified. The following implementation evidence now
 exists and remains subject to RES-004 review:
 
-| Requirement                               | Current evidence                                                                                             | Status                                         |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
-| `v5.0.0-3.2.1` response context           | CSP denies object content and framing; browser/header tests pass                                             | Partial; document responses do not exist       |
-| `v5.0.0-3.4.5` referrer policy            | `strict-origin-when-cross-origin` asserted in central response header configuration                          | Implemented, not independently verified        |
-| `v5.0.0-13.3.1` secret management         | ignored random local secret generation, placeholder rejection/redaction test, pinned Gitleaks CI scan        | Partial; production secret manager deferred    |
-| `v5.0.0-13.3.2` least privilege           | loopback service exposure, Garage admin port withheld, container `no-new-privileges`                         | Partial; separate PostgreSQL roles deferred    |
-| `v5.0.0-15.1.2` component inventory       | exact direct versions/licenses, frozen lockfile, explicit install-script allowlist, moderate-threshold audit | Implemented evidence; SBOM generation deferred |
-| `v5.0.0-16.5.1` safe configuration errors | environment error formatter reports field names without rejected secret values                               | Partial; application error boundary deferred   |
+| Requirement                               | Current evidence                                                                                                                | Status                                         |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `v5.0.0-3.2.1` response context           | CSP denies object content and framing; browser/header tests pass                                                                | Partial; document responses do not exist       |
+| `v5.0.0-3.4.5` referrer policy            | `strict-origin-when-cross-origin` asserted in central response header configuration                                             | Implemented, not independently verified        |
+| `v5.0.0-13.3.1` secret management         | atomic exclusive local-secret publication, symlink/overwrite regression tests, and a pinned Gitleaks synthetic-detection canary | Partial; production secret manager deferred    |
+| `v5.0.0-13.3.2` least privilege           | loopback service exposure, Garage admin port withheld, container `no-new-privileges`                                            | Partial; separate PostgreSQL roles deferred    |
+| `v5.0.0-15.1.2` component inventory       | exact direct versions/licenses, frozen lockfile, explicit install-script allowlist, moderate-threshold audit                    | Implemented evidence; SBOM generation deferred |
+| `v5.0.0-16.5.1` safe configuration errors | environment parser rejects malformed lines without values and validates exported variables when `.env` is absent                | Partial; application error boundary deferred   |
 
 ## Checkpoint B1 evidence
 
@@ -62,12 +62,24 @@ No requirement is marked verified. Phase B1 adds the following automated,
 partial evidence; RES-010 must add request-level deny-by-default tests before any
 authorization requirement can be considered for verification.
 
-| Requirement                      | Current evidence                                                                                                      | Status                                           |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `v5.0.0-8.1.1`, `v5.0.0-8.1.2`   | ADR-0002 defines identity, organization, case, consent, grant, classification, operation, and lifecycle inputs        | Documented design; policy implementation absent  |
-| `v5.0.0-8.2.2`                   | PostgreSQL tests reject cross-case resource/consent references and prove grants address one case membership           | Partial database evidence; route tests absent    |
-| `v5.0.0-8.3.1`                   | Composite foreign keys and constraint triggers enforce case ownership and scoped references below the web layer       | Partial; centralized policy engine absent        |
-| `v5.0.0-8.4.1`                   | Tests reject unverified professional participation and prove one organization member does not inherit another's grant | Partial database evidence; query policy absent   |
-| `v5.0.0-14.1.1`, `v5.0.0-14.1.2` | Resource classification enum separates shared, legal, financial, personal-support, and health-related envelopes       | Schema evidence; field projection tests absent   |
-| `v5.0.0-16.2.1`, `v5.0.0-16.2.5` | Audit schema limits event fields to actor/action/target/outcome/reason/correlation/integrity metadata                 | Schema evidence; emission/redaction tests absent |
-| `v5.0.0-16.4.2`                  | Integration test proves the database rejects audit-event update and delete; hash fields are format-checked and unique | Partial; hash-chain verification deferred        |
+| Requirement                      | Current evidence                                                                                                                        | Status                                                 |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `v5.0.0-8.1.1`, `v5.0.0-8.1.2`   | ADR-0002 defines identity, organization, case, consent, grant, classification, operation, and lifecycle inputs                          | Documented design; policy implementation absent        |
+| `v5.0.0-8.2.2`                   | PostgreSQL tests reject cross-case references; current-state case/resource decisions deny unrelated principals and ineffective grants   | Partial database/domain evidence; route tests absent   |
+| `v5.0.0-8.3.1`                   | Server-domain policy functions and database constraints enforce scoped references and deny missing or stale authorization inputs        | Partial trusted-layer evidence; route binding absent   |
+| `v5.0.0-8.4.1`                   | Tests prove organization peers do not inherit grants and suspended organizations/revoked affiliations immediately lose effective access | Partial database/domain evidence; request tests absent |
+| `v5.0.0-14.1.1`, `v5.0.0-14.1.2` | Resource classification enum separates shared, legal, financial, personal-support, and health-related envelopes                         | Schema evidence; field projection tests absent         |
+| `v5.0.0-16.2.1`, `v5.0.0-16.2.5` | Audit schema limits event fields to actor/action/target/outcome/reason/correlation/integrity metadata                                   | Schema evidence; emission/redaction tests absent       |
+| `v5.0.0-16.4.2`                  | Integration test proves the database rejects audit-event update and delete; hash fields are format-checked and unique                   | Partial; hash-chain verification deferred              |
+
+## PR #4 remediation evidence
+
+No requirement is marked verified. The following tests add implementation
+evidence only:
+
+| Requirement                                    | Automated evidence                                                                                                                                                                                              | Remaining limitation                                         |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `v5.0.0-8.2.2`, `v5.0.0-8.3.1`, `v5.0.0-8.4.1` | `security-boundaries.integration.test.ts` covers unrelated principals, organization suspension, affiliation revocation, consent revocation, grant expiry/revocation, and historical regranting                  | Authenticated request binding is deferred to RES-010/B2      |
+| `v5.0.0-13.3.1`                                | `secure-files.test.mjs` covers exclusive publication, overwrite preservation, partial-write cleanup, and symlink rejection; `test-gitleaks-negative.mjs` requires detection and redaction of a generated canary | Production secret manager selection remains open             |
+| `v5.0.0-16.4.2`                                | Existing database integration test still rejects audit update/delete after migration `0003`                                                                                                                     | Cryptographic chain generation/verification remains deferred |
+| `v5.0.0-16.5.1`                                | `environment-file.test.mjs` and `check-env.test.mjs` cover malformed input and process-only configuration                                                                                                       | Deployed startup wiring remains a B2 gate                    |

@@ -73,6 +73,7 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm test:integration
+pnpm test:postgres-persistence
 pnpm db:validate
 pnpm build
 pnpm exec playwright install chromium
@@ -83,8 +84,10 @@ pnpm audit --audit-level moderate
 `pnpm db:validate` creates a temporary empty database, applies every migration,
 asserts all expected relations and security triggers, and drops the database. The
 integration suite creates another isolated temporary database and proves the B1
-cross-case, cross-organization, consent-scope, ownership, and audit invariants.
-CI runs the same quality gates and a Gitleaks secret scan.
+cross-case, cross-organization, lifecycle, consent-scope, ownership, grant-history,
+and audit invariants. The persistence test removes and recreates a PostgreSQL 18
+container against an isolated named volume. CI also proves that Gitleaks rejects
+and redacts a runtime-generated synthetic secret canary.
 
 ### Local operations
 

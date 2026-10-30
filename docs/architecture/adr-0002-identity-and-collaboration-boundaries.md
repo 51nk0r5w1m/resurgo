@@ -42,14 +42,15 @@ Organizations and cases are deliberately different security boundaries:
 - Audit events are append-only at the database boundary; update and delete raise
   SQLSTATE `55000`.
 
-## Deliberate limits
+## Authorization boundary
 
-The Phase B1 schema is not an authorization engine. RES-010 must still evaluate
-authentication, case and organization membership lifecycle, requested operation,
-classification, resource state, consent/grant validity, and time bounds on every
-request. In particular, an existing grant remains historical evidence after its
-consent is revoked; the policy layer must deny it rather than treating the grant
-row alone as authorization.
+Phase B1 includes narrow server-domain decisions for effective case and resource
+access. They re-evaluate case and organization membership lifecycle, pilot
+organization status, requested operation, consent/grant lifecycle, and time
+bounds for each decision. Revoked or expired grants remain historical evidence
+and never authorize access. RES-010 must still bind these decisions to an
+authenticated principal and every request route; a row identifier supplied by a
+client is never proof of access.
 
 Audit hashes are shape-checked and unique, but Phase B1 does not yet compute or
 verify a tamper-evident chain. Database roles are also not yet split between

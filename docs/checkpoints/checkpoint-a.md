@@ -57,9 +57,9 @@ controls are absent.
 - Local Compose uses one PostgreSQL owner identity and unencrypted local volumes.
   Least-privilege runtime/migration roles and production encryption/key management
   remain gates before real information is handled.
-- The Gitleaks workflow is configured, but remote CI has not run until the commit
-  is pushed. Local staged-content scan evidence is recorded in the checkpoint
-  handoff.
+- The Gitleaks workflow invokes the digest-pinned scanner explicitly. CI and the
+  local regression command prove a runtime-generated synthetic secret produces
+  a finding and is redacted from scanner output.
 - The repository project license remains undecided and is marked `UNLICENSED`.
 
 No authentication, authorization, document, audit-event, or regulatory control is
