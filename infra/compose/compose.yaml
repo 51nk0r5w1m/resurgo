@@ -1,0 +1,65 @@
+name: resurgo
+
+services:
+  postgres:
+    image: postgres:18.6-alpine3.24@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Run pnpm env:init first}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run pnpm env:init first}
+      POSTGRES_USER: ${POSTGRES_USER:?Run pnpm env:init first}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - postgres-data:/var/lib/postgresql
+
+  garage:
+    image: dxflrs/garage:v2.5.0@sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5
+    command: ["/garage", "server", "--single-node", "--default-bucket"]
+    environment:
+      GARAGE_DEFAULT_ACCESS_KEY: ${GARAGE_ACCESS_KEY_ID:?Run pnpm env:init first}
+      GARAGE_DEFAULT_BUCKET: ${GARAGE_BUCKET:?Run pnpm env:init first}
+      GARAGE_DEFAULT_SECRET_KEY: ${GARAGE_SECRET_ACCESS_KEY:?Run pnpm env:init first}
+      GARAGE_LOG_FORMAT: json
+      NO_COLOR: "1"
+    healthcheck:
+      test: ["CMD", "/garage", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - "127.0.0.1:${GARAGE_PORT:-3900}:3900"
+    read_only: true
+    restart: unless-stopped
+    secrets:
+      - garage_admin_token
+      - garage_metrics_token
+      - garage_rpc_secret
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    volumes:
+      - ./garage.toml:/etc/garage.toml:ro
+      - garage-data:/var/lib/garage/data
+      - garage-meta:/var/lib/garage/meta
+
+secrets:
+  garage_admin_token:
+    file: ../../.secrets/garage_admin_token
+  garage_metrics_token:
+    file: ../../.secrets/garage_metrics_token
+  garage_rpc_secret:
+    file: ../../.secrets/garage_rpc_secret
+
+volumes:
+  garage-data:
+  garage-meta:
+  postgres-data:
