@@ -61,9 +61,9 @@ redundancy and is not a production topology.
 ## CI actions
 
 GitHub Actions are pinned to immutable commits, with version comments in
-`.github/workflows/ci.yml`: checkout v5, setup-node v6, and pnpm/action-setup v4.
-Gitleaks 8.30.1 runs from an immutable container digest against the full
-checked-out Git history, without GitHub API permissions.
+`.github/workflows/ci.yml`: checkout v5, setup-node v6, and pnpm/action-setup
+v6.1.0. Gitleaks 8.30.1 runs from an immutable container digest against the
+full checked-out Git history, without GitHub API permissions.
 
 ## Unresolved licensing decision
 
