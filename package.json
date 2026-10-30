@@ -28,6 +28,7 @@
     "start": "dotenv -e .env -- pnpm --filter @resurgo/web start",
     "test": "vitest run",
     "test:integration": "dotenv -e .env -- vitest run --config vitest.integration.config.ts",
+    "test:postgres-persistence": "node scripts/test-postgres-persistence.mjs",
     "test:e2e": "playwright test",
     "typecheck": "pnpm --recursive --if-present typecheck"
   },

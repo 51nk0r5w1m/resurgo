@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
-import { chmod, mkdir, open, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+
+import { ensurePrivateDirectory, writeExclusive } from "./lib/secure-files.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const envPath = resolve(root, ".env");
@@ -10,27 +11,7 @@ function randomHex(bytes) {
   return randomBytes(bytes).toString("hex");
 }
 
-async function writeExclusive(path, contents) {
-  try {
-    const file = await open(path, "wx", 0o600);
-    await file.writeFile(contents);
-    await file.close();
-    return true;
-  } catch (error) {
-    if (
-      error &&
-      typeof error === "object" &&
-      "code" in error &&
-      error.code === "EEXIST"
-    ) {
-      return false;
-    }
-    throw error;
-  }
-}
-
-await mkdir(secretsDirectory, { mode: 0o700, recursive: true });
-await chmod(secretsDirectory, 0o700);
+await ensurePrivateDirectory(secretsDirectory);
 
 const postgresPassword = randomHex(24);
 const garageAccessKey = `GK${randomHex(16).toUpperCase()}`;
@@ -61,13 +42,10 @@ const secretFiles = [
 
 for (const [name, secret] of secretFiles) {
   const path = resolve(secretsDirectory, name);
-  if (await writeExclusive(path, `${secret}\n`)) {
-    await chmod(path, 0o600);
-  }
+  await writeExclusive(path, `${secret}\n`);
 }
 
 if (envCreated) {
-  await chmod(envPath, 0o600);
   console.log("Created local .env and Garage secret files.");
 } else {
   console.log(
@@ -75,10 +53,7 @@ if (envCreated) {
   );
 }
 
-await writeFile(
+await writeExclusive(
   resolve(secretsDirectory, ".initialized"),
   "local-development-only\n",
-  {
-    mode: 0o600,
-  },
 );

@@ -18,7 +18,7 @@ services:
     security_opt:
       - no-new-privileges:true
     volumes:
-      - postgres-data:/var/lib/postgresql
+      - postgres-data:/var/lib/postgresql/18/docker
 
   garage:
     image: dxflrs/garage:v2.5.0@sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5

@@ -1,25 +1,18 @@
-import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import {
   formatEnvironmentError,
   parseEnvironment,
 } from "../packages/config/src/environment.ts";
+import { readOptionalEnvironmentFile } from "./lib/environment-file.mjs";
 
-const envPath = resolve(import.meta.dirname, "../.env");
-const envText = await readFile(envPath, "utf8");
-const input = Object.fromEntries(
-  envText
-    .split(/\r?\n/u)
-    .filter((line) => line && !line.startsWith("#"))
-    .map((line) => {
-      const separator = line.indexOf("=");
-      return [line.slice(0, separator), line.slice(separator + 1)];
-    }),
-);
+const envPath = process.env.RESURGO_ENV_FILE
+  ? resolve(process.env.RESURGO_ENV_FILE)
+  : resolve(import.meta.dirname, "../.env");
 
 try {
-  parseEnvironment({ ...process.env, ...input });
+  const fileEnvironment = await readOptionalEnvironmentFile(envPath);
+  parseEnvironment({ ...fileEnvironment, ...process.env });
   console.log("Environment configuration is valid.");
 } catch (error) {
   if (error && typeof error === "object" && "issues" in error) {
