@@ -6,6 +6,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   text,
   timestamp,
   unique,
@@ -45,6 +46,8 @@ export const documents = resurgoSchema.table(
       mode: "date",
       withTimezone: true,
     }),
+    archivedAt: timestamp("archived_at", { mode: "date", withTimezone: true }),
+    archivedByCaseMembershipId: uuid("archived_by_case_membership_id"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -62,6 +65,15 @@ export const documents = resurgoSchema.table(
       name: "documents_case_resource_fk",
     }).onDelete("restrict"),
     foreignKey({
+      columns: [table.caseId, table.archivedByCaseMembershipId],
+      foreignColumns: [caseMemberships.caseId, caseMemberships.id],
+      name: "documents_archived_by_membership_fk",
+    }).onDelete("restrict"),
+    check(
+      "documents_archive_state_check",
+      sql`(${table.archivedAt} is null and ${table.archivedByCaseMembershipId} is null) or (${table.archivedAt} is not null and ${table.archivedByCaseMembershipId} is not null)`,
+    ),
+    foreignKey({
       columns: [table.caseId, table.ownerCaseMembershipId],
       foreignColumns: [caseMemberships.caseId, caseMemberships.id],
       name: "documents_owner_membership_fk",
@@ -73,6 +85,92 @@ export const documents = resurgoSchema.table(
     check(
       "documents_retention_class_check",
       sql`${table.retentionClass} ~ '^[a-z][a-z0-9_]{1,63}$'`,
+    ),
+  ],
+);
+
+export const documentComments = resurgoSchema.table(
+  "document_comments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    caseId: uuid("case_id").notNull(),
+    documentId: uuid("document_id").notNull(),
+    documentVersionId: uuid("document_version_id").notNull(),
+    authorCaseMembershipId: uuid("author_case_membership_id").notNull(),
+    kind: text("kind").default("comment").notNull(),
+    body: text("body").notNull(),
+    anchor: jsonb("anchor"),
+    parentCommentId: uuid("parent_comment_id"),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("document_comments_case_id_id_unique").on(table.caseId, table.id),
+    index("document_comments_version_created_idx").on(
+      table.documentVersionId,
+      table.createdAt,
+    ),
+    foreignKey({
+      columns: [table.caseId, table.documentId, table.documentVersionId],
+      foreignColumns: [
+        documentVersions.caseId,
+        documentVersions.documentId,
+        documentVersions.id,
+      ],
+      name: "document_comments_version_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.caseId, table.authorCaseMembershipId],
+      foreignColumns: [caseMemberships.caseId, caseMemberships.id],
+      name: "document_comments_author_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.caseId, table.parentCommentId],
+      foreignColumns: [table.caseId, table.id],
+      name: "document_comments_parent_fk",
+    }).onDelete("restrict"),
+    check(
+      "document_comments_kind_check",
+      sql`${table.kind} in ('comment', 'highlight')`,
+    ),
+    check(
+      "document_comments_body_check",
+      sql`length(trim(${table.body})) between 1 and 4000`,
+    ),
+  ],
+);
+
+export const documentCommentEvents = resurgoSchema.table(
+  "document_comment_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    caseId: uuid("case_id").notNull(),
+    commentId: uuid("comment_id").notNull(),
+    actorCaseMembershipId: uuid("actor_case_membership_id").notNull(),
+    status: text("status").notNull(),
+    occurredAt: timestamp("occurred_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("document_comment_events_comment_time_idx").on(
+      table.commentId,
+      table.occurredAt,
+    ),
+    foreignKey({
+      columns: [table.caseId, table.commentId],
+      foreignColumns: [documentComments.caseId, documentComments.id],
+      name: "document_comment_events_comment_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.caseId, table.actorCaseMembershipId],
+      foreignColumns: [caseMemberships.caseId, caseMemberships.id],
+      name: "document_comment_events_actor_fk",
+    }).onDelete("restrict"),
+    check(
+      "document_comment_events_status_check",
+      sql`${table.status} in ('open', 'resolved', 'reopened')`,
     ),
   ],
 );

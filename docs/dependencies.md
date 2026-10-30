@@ -12,39 +12,41 @@ this compatibility override.
 
 ## Application and workspace
 
-| Dependency                     |     Version | License      | Purpose                                                       |
-| ------------------------------ | ----------: | ------------ | ------------------------------------------------------------- |
-| Node.js                        | 26.13.0 LTS | MIT          | JavaScript runtime                                            |
-| pnpm                           |     12.16.1 | MIT          | Workspace package manager                                     |
-| Next.js / `eslint-config-next` |      16.4.3 | MIT          | App Router application and lint rules                         |
-| React / React DOM              |      19.3.1 | MIT          | User interface runtime                                        |
-| TypeScript                     |       6.0.3 | Apache-2.0   | Newest release supported by Next.js's TypeScript ESLint chain |
-| Tailwind CSS / PostCSS adapter |       4.3.3 | MIT          | Design tokens and utility CSS                                 |
-| Drizzle ORM                    |      0.45.4 | Apache-2.0   | Typed PostgreSQL access                                       |
-| Drizzle Kit                    |     0.31.11 | MIT          | Migration generation and validation                           |
-| `pg` / `@types/pg`             |      8.23.1 | MIT          | PostgreSQL driver and types                                   |
-| Zod                            |       4.6.7 | MIT          | Environment and boundary validation                           |
-| Radix Slot                     |       1.5.0 | MIT          | shadcn-compatible composition primitive                       |
-| Class Variance Authority       |       0.7.1 | Apache-2.0   | shadcn-compatible component variants                          |
-| `clsx`                         |       2.1.1 | MIT          | Conditional class composition                                 |
-| `tailwind-merge`               |       3.7.0 | MIT          | Tailwind class conflict resolution                            |
-| Lucide React                   |      1.64.0 | ISC          | Accessible icon components                                    |
-| Vitest                         |      4.1.12 | MIT          | Unit tests                                                    |
-| Playwright                     |      1.64.1 | Apache-2.0   | Browser acceptance tests                                      |
-| ESLint                         |      9.39.5 | MIT          | Newest major supported by Next.js's lint plugins              |
-| Prettier                       |      3.9.10 | MIT          | Formatting                                                    |
-| Prettier Tailwind plugin       |       0.8.1 | MIT          | Deterministic class ordering                                  |
-| `dotenv-cli`                   |      11.1.0 | MIT          | Root environment injection for workspace commands             |
-| Better Auth / Drizzle adapter  |      1.7.14 | MIT          | Identity, sessions, recovery, verification, and TOTP MFA      |
-| Nodemailer                     |      10.3.1 | MIT-0        | SMTP delivery to the local email-capture service              |
-| Fastify Busboy                 |       3.2.4 | MIT          | Streaming multipart parsing with explicit upload limits       |
-| AWS SDK S3 client              |    3.1159.0 | Apache-2.0   | Private S3-compatible quarantine and released-object access   |
-| PDF.js                         |     6.4.299 | Apache-2.0   | Sandboxed PDF parsing and client rendering                    |
-| pdf-lib                        |      1.17.1 | MIT          | Server-side PDF structural parsing/manipulation               |
-| ZIP.js                         |      2.24.0 | BSD-3-Clause | Bounded native DOCX/OOXML archive inspection                  |
-| fast-xml-parser                |      5.11.2 | MIT          | Required DOCX XML-part parsing and structural validation      |
-| `@napi-rs/canvas`              |      1.0.13 | MIT          | Worker-only PDF page rasterization                            |
-| tsx                            |     4.23.15 | MIT          | Worker TypeScript runtime with ESM workspace resolution       |
+| Dependency                     |     Version | License      | Purpose                                                         |
+| ------------------------------ | ----------: | ------------ | --------------------------------------------------------------- |
+| Node.js                        | 26.13.0 LTS | MIT          | JavaScript runtime                                              |
+| pnpm                           |     12.16.1 | MIT          | Workspace package manager                                       |
+| Next.js / `eslint-config-next` |      16.4.3 | MIT          | App Router application and lint rules                           |
+| React / React DOM              |      19.3.1 | MIT          | User interface runtime                                          |
+| TypeScript                     |       6.0.3 | Apache-2.0   | Newest release supported by Next.js's TypeScript ESLint chain   |
+| Tailwind CSS / PostCSS adapter |       4.3.3 | MIT          | Design tokens and utility CSS                                   |
+| Drizzle ORM                    |      0.45.4 | Apache-2.0   | Typed PostgreSQL access                                         |
+| Drizzle Kit                    |     0.31.11 | MIT          | Migration generation and validation                             |
+| `pg` / `@types/pg`             |      8.23.1 | MIT          | PostgreSQL driver and types                                     |
+| Zod                            |       4.6.7 | MIT          | Environment and boundary validation                             |
+| Radix Slot                     |       1.5.0 | MIT          | shadcn-compatible composition primitive                         |
+| Class Variance Authority       |       0.7.1 | Apache-2.0   | shadcn-compatible component variants                            |
+| `clsx`                         |       2.1.1 | MIT          | Conditional class composition                                   |
+| `tailwind-merge`               |       3.7.0 | MIT          | Tailwind class conflict resolution                              |
+| Lucide React                   |      1.64.0 | ISC          | Accessible icon components                                      |
+| Vitest                         |      4.1.12 | MIT          | Unit tests                                                      |
+| Playwright                     |      1.64.1 | Apache-2.0   | Browser acceptance tests                                        |
+| ESLint                         |      9.39.5 | MIT          | Newest major supported by Next.js's lint plugins                |
+| Prettier                       |      3.9.10 | MIT          | Formatting                                                      |
+| Prettier Tailwind plugin       |       0.8.1 | MIT          | Deterministic class ordering                                    |
+| `dotenv-cli`                   |      11.1.0 | MIT          | Root environment injection for workspace commands               |
+| Better Auth / Drizzle adapter  |      1.7.14 | MIT          | Identity, sessions, recovery, verification, and TOTP MFA        |
+| Nodemailer                     |      10.3.1 | MIT-0        | SMTP delivery to the local email-capture service                |
+| Fastify Busboy                 |       3.2.4 | MIT          | Streaming multipart parsing with explicit upload limits         |
+| AWS SDK S3 client              |    3.1159.0 | Apache-2.0   | Private S3-compatible quarantine and released-object access     |
+| PDF.js                         |     6.4.299 | Apache-2.0   | Sandboxed PDF parsing and client rendering                      |
+| Docxodus                       |      12.6.2 | MIT          | Browser-side native DOCX rendering and deterministic comparison |
+| React Docxodus Viewer          |       0.7.0 | MIT          | Paginated DOCX viewer, tracked changes, and review controls     |
+| pdf-lib                        |      1.17.1 | MIT          | Server-side PDF structural parsing/manipulation                 |
+| ZIP.js                         |      2.24.0 | BSD-3-Clause | Bounded native DOCX/OOXML archive inspection                    |
+| fast-xml-parser                |      5.11.2 | MIT          | Required DOCX XML-part parsing and structural validation        |
+| `@napi-rs/canvas`              |      1.0.13 | MIT          | Worker-only PDF page rasterization                              |
+| tsx                            |     4.23.15 | MIT          | Worker TypeScript runtime with ESM workspace resolution         |
 
 Type packages use their corresponding published MIT licenses:
 `@types/node` 26.6.6, `@types/react` 19.3.0, and `@types/react-dom`

@@ -6,6 +6,8 @@ import {
   auditEvents,
   caseResources,
   disclosureConsents,
+  documentCommentEvents,
+  documentComments,
   documentContributors,
   documentLegalHoldEvents,
   documentProcessingEvents,
@@ -207,7 +209,9 @@ export async function recordDocumentProcessingEvent(
     const validTransition =
       (input.status === "quarantined" && latest === undefined) ||
       (input.status === "rejected" &&
-        (latest?.status === "quarantined" || latest?.status === "processing"));
+        (latest === undefined ||
+          latest.status === "quarantined" ||
+          latest.status === "processing"));
     if (!validTransition) {
       throw new Error("Invalid document processing status transition");
     }
@@ -233,7 +237,9 @@ export async function listAuthorizedDocuments(
   await requireCaseAuthorization(database, { ...input, operation: "read" });
   const result = await database.execute<{
     confidentiality: Confidentiality;
+    classification: Classification;
     created_at: Date;
+    byte_size: number;
     document_id: string;
     format: DocumentFormat;
     processing_status: string;
@@ -243,12 +249,15 @@ export async function listAuthorizedDocuments(
     version_number: number;
   }>(sql`
     select document.id as document_id, document.title, document.format,
-      document.confidentiality, document.created_at, document.case_resource_id as resource_id,
-      version.id as version_id, version.version_number,
+      document.confidentiality, resource.classification, document.created_at,
+      document.case_resource_id as resource_id,
+      version.id as version_id, version.version_number, version.byte_size,
       latest_processing.status as processing_status
     from resurgo.documents document
+    inner join resurgo.case_resources resource
+      on resource.case_id = document.case_id and resource.id = document.case_resource_id
     inner join lateral (
-      select id, version_number
+      select id, version_number, byte_size
       from resurgo.document_versions
       where case_id = document.case_id and document_id = document.id
       order by version_number desc
@@ -264,6 +273,7 @@ export async function listAuthorizedDocuments(
       limit 1
     ) latest_processing on true
     where document.case_id = ${input.caseId}
+      and document.archived_at is null
     order by document.created_at desc
   `);
   const authorized = [];
@@ -377,6 +387,7 @@ export async function addDocumentVersion(
     source: "client_upload" | "professional_upload" | "generated" | "imported";
     sourceReference?: string;
     userId: string;
+    recordInitialQuarantineEvent?: boolean;
   },
 ) {
   assertVersionMetadata(input);
@@ -457,13 +468,15 @@ export async function addDocumentVersion(
       caseId: input.caseId,
       supersededDocumentVersionId: latest.id,
     });
-    await transaction.insert(documentProcessingEvents).values({
-      actorCaseMembershipId: authorization.caseMembershipId,
-      caseId: input.caseId,
-      documentId: input.documentId,
-      documentVersionId: version.id,
-      status: "quarantined",
-    });
+    if (input.recordInitialQuarantineEvent !== false) {
+      await transaction.insert(documentProcessingEvents).values({
+        actorCaseMembershipId: authorization.caseMembershipId,
+        caseId: input.caseId,
+        documentId: input.documentId,
+        documentVersionId: version.id,
+        status: "quarantined",
+      });
+    }
     await transaction.insert(auditEvents).values(
       buildAuditEvent({
         action: "document.version.created",
@@ -476,6 +489,250 @@ export async function addDocumentVersion(
       }),
     );
     return version;
+  });
+}
+
+export async function getAuthorizedDocumentDetail(
+  database: Database,
+  input: { caseId: string; documentId: string; userId: string },
+) {
+  await requireCaseAuthorization(database, { ...input, operation: "read" });
+  const [document] = await database
+    .select({
+      archivedAt: documents.archivedAt,
+      classification: caseResources.classification,
+      confidentiality: documents.confidentiality,
+      createdAt: documents.createdAt,
+      format: documents.format,
+      id: documents.id,
+      resourceId: documents.caseResourceId,
+      retainUntil: documents.retainUntil,
+      retentionClass: documents.retentionClass,
+      title: documents.title,
+    })
+    .from(documents)
+    .innerJoin(
+      caseResources,
+      and(
+        eq(caseResources.caseId, documents.caseId),
+        eq(caseResources.id, documents.caseResourceId),
+      ),
+    )
+    .where(
+      and(
+        eq(documents.caseId, input.caseId),
+        eq(documents.id, input.documentId),
+      ),
+    )
+    .limit(1);
+  if (
+    !document ||
+    !(await hasEffectiveResourceAccess(database, {
+      caseId: input.caseId,
+      operation: "view",
+      resourceId: document.resourceId,
+      userId: input.userId,
+    }))
+  ) {
+    throw new AuthorizationDeniedError();
+  }
+  const versionResult = await database.execute<{
+    byte_size: number;
+    content_hash: string;
+    created_at: Date;
+    id: string;
+    mime_type: string;
+    processing_status: string;
+    source: string;
+    supersedes_version_id: string | null;
+    version_number: number;
+  }>(sql`
+    select version.id, version.version_number, version.content_hash,
+      version.byte_size, version.mime_type, version.source,
+      version.supersedes_version_id, version.created_at,
+      latest_processing.status as processing_status
+    from resurgo.document_versions version
+    inner join lateral (
+      select status
+      from resurgo.document_processing_events
+      where case_id = version.case_id
+        and document_id = version.document_id
+        and document_version_id = version.id
+      order by occurred_at desc, id desc
+      limit 1
+    ) latest_processing on true
+    where version.case_id = ${input.caseId}
+      and version.document_id = ${input.documentId}
+    order by version.version_number desc
+  `);
+  const comments = await database.execute<{
+    anchor: unknown;
+    author_name: string;
+    body: string;
+    created_at: Date;
+    document_version_id: string;
+    id: string;
+    kind: "comment" | "highlight";
+    parent_comment_id: string | null;
+    status: "open" | "resolved" | "reopened";
+  }>(sql`
+    select comment.id, comment.document_version_id, comment.kind,
+      comment.body, comment.anchor, comment.parent_comment_id,
+      comment.created_at, author.name as author_name,
+      latest_event.status
+    from resurgo.document_comments comment
+    inner join resurgo.case_memberships membership
+      on membership.case_id = comment.case_id
+      and membership.id = comment.author_case_membership_id
+    inner join auth.user author on author.id = membership.user_id
+    inner join lateral (
+      select status from resurgo.document_comment_events
+      where case_id = comment.case_id and comment_id = comment.id
+      order by occurred_at desc, id desc limit 1
+    ) latest_event on true
+    where comment.case_id = ${input.caseId}
+      and comment.document_id = ${input.documentId}
+    order by comment.created_at asc, comment.id asc
+  `);
+  return { comments: comments.rows, document, versions: versionResult.rows };
+}
+
+export async function addDocumentComment(
+  database: Database,
+  input: {
+    anchor?: unknown;
+    body: string;
+    caseId: string;
+    documentId: string;
+    kind: "comment" | "highlight";
+    parentCommentId?: string;
+    userId: string;
+    versionId: string;
+  },
+) {
+  const body = input.body.trim();
+  if (body.length < 1 || body.length > 4000) {
+    throw new Error("Document comment is outside the permitted range");
+  }
+  return database.transaction(async (transaction) => {
+    const [document] = await transaction
+      .select({ resourceId: documents.caseResourceId })
+      .from(documents)
+      .innerJoin(
+        documentVersions,
+        and(
+          eq(documentVersions.caseId, documents.caseId),
+          eq(documentVersions.documentId, documents.id),
+        ),
+      )
+      .where(
+        and(
+          eq(documents.caseId, input.caseId),
+          eq(documents.id, input.documentId),
+          eq(documentVersions.id, input.versionId),
+        ),
+      )
+      .limit(1);
+    if (
+      !document ||
+      !(await hasEffectiveResourceAccess(transaction, {
+        caseId: input.caseId,
+        operation: "contribute",
+        resourceId: document.resourceId,
+        userId: input.userId,
+      }))
+    ) {
+      throw new AuthorizationDeniedError();
+    }
+    const authorization = await requireCaseAuthorization(transaction, {
+      caseId: input.caseId,
+      operation: "read",
+      userId: input.userId,
+    });
+    const [comment] = await transaction
+      .insert(documentComments)
+      .values({
+        anchor: input.anchor,
+        authorCaseMembershipId: authorization.caseMembershipId,
+        body,
+        caseId: input.caseId,
+        documentId: input.documentId,
+        documentVersionId: input.versionId,
+        kind: input.kind,
+        parentCommentId: input.parentCommentId,
+      })
+      .returning();
+    if (!comment) throw new Error("Document comment creation failed");
+    await transaction.insert(documentCommentEvents).values({
+      actorCaseMembershipId: authorization.caseMembershipId,
+      caseId: input.caseId,
+      commentId: comment.id,
+      status: "open",
+    });
+    await transaction.insert(auditEvents).values(
+      buildAuditEvent({
+        action: `document.${input.kind}.created`,
+        actorType: "user",
+        actorUserId: input.userId,
+        caseId: input.caseId,
+        outcome: "success",
+        resourceId: comment.id,
+        resourceType: "document_comment",
+      }),
+    );
+    return comment;
+  });
+}
+
+export async function archiveDocument(
+  database: Database,
+  input: { caseId: string; documentId: string; userId: string },
+) {
+  return database.transaction(async (transaction) => {
+    const authorization = await requireCaseAuthorization(transaction, {
+      caseId: input.caseId,
+      operation: "manage",
+      userId: input.userId,
+    });
+    const activeHold = await transaction.execute<{ active: boolean }>(sql`
+      select coalesce((
+        select action = 'placed'
+        from resurgo.document_legal_hold_events
+        where case_id = ${input.caseId} and document_id = ${input.documentId}
+        order by occurred_at desc, id desc limit 1
+      ), false) as active
+    `);
+    if (activeHold.rows[0]?.active) {
+      throw new Error("Document is subject to an active legal hold");
+    }
+    const archivedAt = new Date();
+    const [document] = await transaction
+      .update(documents)
+      .set({
+        archivedAt,
+        archivedByCaseMembershipId: authorization.caseMembershipId,
+      })
+      .where(
+        and(
+          eq(documents.caseId, input.caseId),
+          eq(documents.id, input.documentId),
+          sql`${documents.archivedAt} is null`,
+        ),
+      )
+      .returning();
+    if (!document) throw new AuthorizationDeniedError();
+    await transaction.insert(auditEvents).values(
+      buildAuditEvent({
+        action: "document.archived",
+        actorType: "user",
+        actorUserId: input.userId,
+        caseId: input.caseId,
+        outcome: "success",
+        resourceId: input.documentId,
+        resourceType: "document",
+      }),
+    );
+    return document;
   });
 }
 

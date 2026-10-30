@@ -96,7 +96,8 @@ async function validateDocx(bytes: Uint8Array): Promise<ValidatedDocument> {
         let requiredBytes = 0;
         const captureRequired =
           entry.filename === "[Content_Types].xml" ||
-          entry.filename === "word/document.xml";
+          entry.filename === "word/document.xml" ||
+          entry.filename.endsWith(".rels");
         await entry.getData(
           new WritableStream<Uint8Array>({
             write(chunk) {
@@ -173,6 +174,35 @@ async function validateDocx(bytes: Uint8Array): Promise<ValidatedDocument> {
     );
     if (!declaresMainDocument || !("document" in documentPart)) {
       throw new Error("Required OOXML parts do not describe a DOCX document");
+    }
+    for (const [name, bytes] of requiredXml) {
+      if (!name.endsWith(".rels")) continue;
+      let relationships: Record<string, unknown>;
+      try {
+        relationships = parser.parse(
+          new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+        ) as Record<string, unknown>;
+      } catch {
+        throw new Error("OOXML relationship part is not valid UTF-8 XML");
+      }
+      const root = relationships.Relationships as
+        { Relationship?: unknown | unknown[] } | undefined;
+      const entries = Array.isArray(root?.Relationship)
+        ? root.Relationship
+        : root?.Relationship
+          ? [root.Relationship]
+          : [];
+      if (
+        entries.some(
+          (relationship) =>
+            typeof relationship === "object" &&
+            relationship !== null &&
+            "@_TargetMode" in relationship &&
+            String(relationship["@_TargetMode"]).toLowerCase() === "external",
+        )
+      ) {
+        throw new Error("External OOXML relationships are not permitted");
+      }
     }
   } finally {
     await reader.close();

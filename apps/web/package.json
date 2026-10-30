@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
-    "dev": "next dev --hostname 127.0.0.1",
+    "assets:docxodus": "node scripts/copy-docxodus-runtime.mjs",
+    "build": "pnpm assets:docxodus && next build",
+    "dev": "pnpm assets:docxodus && next dev --hostname 127.0.0.1",
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "next typegen && tsc --noEmit"
   },
@@ -16,11 +17,14 @@
     "@resurgo/documents": "catalog:",
     "@resurgo/ui": "workspace:*",
     "better-auth": "catalog:",
+    "docxodus": "catalog:",
     "lucide-react": "1.64.0",
     "next": "16.4.3",
     "nodemailer": "catalog:",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "react-docxodus-viewer": "catalog:",
+    "pdfjs-dist": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

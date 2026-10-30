@@ -31,7 +31,7 @@ test("client registers, verifies, creates a private case, and builds a roadmap",
   page,
   request,
 }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(180_000);
   const email = `atlanta-client-${Date.now()}@resurgo.test`;
   const password = "Synthetic-Client-Password-42!";
 
@@ -57,7 +57,9 @@ test("client registers, verifies, creates a private case, and builds a roadmap",
     .selectOption("GA-FULTON-SUPERIOR");
   await page.getByRole("button", { name: "Create private case" }).click();
   await expect(page).toHaveURL(/\/cases\/[0-9a-f-]+\/discovery$/u);
-  await expect(page.getByText("Fulton County Superior Court")).toBeVisible();
+  await expect(
+    page.getByText("Fulton County Superior Court").first(),
+  ).toBeVisible();
 
   await page.getByLabel("We own property together").check();
   await page.getByRole("button", { name: "Save and continue" }).click();
@@ -105,43 +107,152 @@ test("client registers, verifies, creates a private case, and builds a roadmap",
     page.getByText(/not legal advice, a mortgage eligibility decision/u),
   ).toBeVisible();
 
-  await page.getByRole("link", { name: "Documents" }).click();
+  await page
+    .getByRole("navigation", { name: "Case workspace" })
+    .getByRole("link", { name: "Documents" })
+    .click();
   await expect(
-    page.getByRole("heading", {
-      name: "Documents stay within their boundaries.",
-    }),
+    page.getByRole("heading", { name: "Documents", exact: true }),
   ).toBeVisible();
   const syntheticPdf = await PDFDocument.create();
   syntheticPdf.addPage([612, 792]);
   const uploadRegion = page.getByRole("region", { name: "Upload document" });
-  await uploadRegion
-    .getByLabel("Document title")
-    .fill("Synthetic mortgage statement");
   await uploadRegion.getByLabel("Information domain").selectOption("financial");
-  await page.getByLabel("Confidentiality").selectOption("financial_restricted");
-  await page.getByLabel("PDF or DOCX file").setInputFiles({
+  await uploadRegion
+    .getByLabel("Confidentiality")
+    .selectOption("financial_restricted");
+  await uploadRegion.getByLabel("Choose PDF or DOCX files").setInputFiles({
     buffer: Buffer.from(await syntheticPdf.save()),
     mimeType: "application/pdf",
     name: "synthetic-mortgage-statement.pdf",
   });
-  await uploadRegion.getByRole("button", { name: "Upload securely" }).click();
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/documents") &&
+        response.request().method() === "POST",
+    ),
+    uploadRegion.getByRole("button", { name: "Upload 1 securely" }).click(),
+  ]);
   await expect(uploadRegion.getByRole("status")).toContainText(
-    "It remains unavailable while validation and malware scanning run.",
+    "1 of 1 files uploaded to quarantine",
   );
+  await expect(uploadRegion.getByRole("status")).toContainText(
+    "1 of 1 files uploaded to quarantine",
+  );
+  const pdfRow = page
+    .locator(".document-table li")
+    .filter({ hasText: "synthetic-mortgage-statement" });
+  await expect
+    .poll(
+      async () => {
+        await page.reload();
+        return pdfRow.locator(".document-status").textContent();
+      },
+      { timeout: 30_000 },
+    )
+    .toContain("available");
+  await pdfRow
+    .getByRole("link", { name: /synthetic-mortgage-statement/u })
+    .click();
+  const privateDocumentUrl = page.url();
+  await expect(page.locator("canvas")).toBeVisible();
+  await page
+    .getByPlaceholder("Add a question, clarification, or review note…")
+    .fill("Please confirm this synthetic mortgage balance.");
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/comments") &&
+        response.request().method() === "POST",
+    ),
+    page.getByRole("button", { name: "Add comment" }).click(),
+  ]);
+  await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Synthetic mortgage statement" }),
+    page.getByText("Please confirm this synthetic mortgage balance."),
   ).toBeVisible();
-  const processingStatus = page.locator(".document-status");
-  await expect(processingStatus).toHaveText(
-    /^(quarantined|processing|available)$/u,
+  const revisedPdf = await PDFDocument.create();
+  revisedPdf.addPage([612, 792]);
+  await page.getByLabel("Choose revised PDF file").setInputFiles({
+    buffer: Buffer.from(await revisedPdf.save()),
+    mimeType: "application/pdf",
+    name: "synthetic-mortgage-statement-v2.pdf",
+  });
+  await page.getByRole("button", { name: "Upload new version" }).click();
+  await expect
+    .poll(
+      async () => {
+        await page.reload();
+        return page
+          .locator(".review-toolbar select")
+          .first()
+          .locator("option")
+          .allTextContents();
+      },
+      { timeout: 30_000 },
+    )
+    .toContain("Version 2 · available");
+  await page
+    .locator(".review-toolbar select")
+    .first()
+    .selectOption({ label: "Version 2 · available" });
+  await page.getByLabel("Compare with").selectOption({ label: "Version 1" });
+  await expect(page.locator(".viewer-comparison canvas")).toHaveCount(2);
+  const download = page.waitForEvent("download");
+  await page.getByRole("link", { name: "Download version" }).click();
+  expect((await download).suggestedFilename()).toMatch(/\.pdf$/u);
+
+  await page
+    .getByRole("navigation", { name: "Case workspace" })
+    .getByRole("link", { name: "Documents" })
+    .click();
+  await uploadRegion.getByLabel("Information domain").selectOption("legal");
+  await uploadRegion
+    .getByLabel("Choose PDF or DOCX files")
+    .setInputFiles("tests/fixtures/synthetic-property-summary.docx");
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/documents") &&
+        response.request().method() === "POST",
+    ),
+    uploadRegion.getByRole("button", { name: "Upload 1 securely" }).click(),
+  ]);
+  await expect(uploadRegion.getByRole("status")).toContainText(
+    "1 of 1 files uploaded to quarantine",
   );
-  if ((await processingStatus.textContent()) === "available") {
-    await expect(page.getByRole("link", { name: "Preview" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Download" })).toBeVisible();
-  } else {
-    await expect(page.getByRole("link", { name: "Preview" })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Download" })).toHaveCount(0);
-  }
+  const docxRow = page
+    .locator(".document-table li")
+    .filter({ hasText: "synthetic-property-summary" });
+  await expect
+    .poll(
+      async () => {
+        await page.reload();
+        return docxRow.locator(".document-status").textContent();
+      },
+      { timeout: 30_000 },
+    )
+    .toContain("available");
+  await docxRow
+    .getByRole("link", { name: /synthetic-property-summary/u })
+    .click();
+  await expect(
+    page.getByText("Synthetic Resurgo property transition summary").last(),
+  ).toBeVisible({ timeout: 20_000 });
+
+  await page
+    .getByRole("navigation", { name: "Case workspace" })
+    .getByRole("link", { name: "Documents" })
+    .click();
+  await page.getByPlaceholder("Search documents…").fill("mortgage");
+  await expect(
+    page.getByRole("link", { name: "synthetic-mortgage-statement" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "synthetic-property-summary" }),
+  ).toHaveCount(0);
+  await page.getByPlaceholder("Search documents…").clear();
   await page
     .getByLabel("Request title")
     .fill("Synthetic property appraisal request");
@@ -168,4 +279,19 @@ test("client registers, verifies, creates a private case, and builds a roadmap",
   await expect(page).toHaveURL(/\/login$/u);
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/login$/u);
+
+  const unrelatedEmail = `unrelated-client-${Date.now()}@resurgo.test`;
+  await page.goto("/register");
+  await page.getByLabel("Your name").fill("Synthetic Unrelated Client");
+  await page.getByLabel("Email address").fill(unrelatedEmail);
+  await page.getByLabel("Password").fill(password);
+  await page.getByRole("button", { name: "Create private account" }).click();
+  await page.goto(await verificationUrl(request, unrelatedEmail));
+  await page.goto("/login");
+  await page.getByLabel("Email address").fill(unrelatedEmail);
+  await page.getByLabel("Password").fill(password);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/dashboard$/u);
+  const denied = await page.goto(privateDocumentUrl);
+  expect(denied?.status()).toBe(404);
 });

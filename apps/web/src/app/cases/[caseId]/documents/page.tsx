@@ -6,9 +6,10 @@ import {
   listAuthorizedProfessionalReviews,
 } from "@resurgo/db";
 import { headers } from "next/headers";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { CasePageHeader } from "../../../../components/case-page-header";
+import { DocumentLibrary } from "../../../../components/document-library";
 import { DocumentUploadForm } from "../../../../components/document-upload-form";
 import { DocumentRequestAction } from "../../../../components/document-request-action";
 import { DocumentRequestForm } from "../../../../components/document-request-form";
@@ -56,68 +57,40 @@ export default async function DocumentsPage({
   }
 
   return (
-    <main className="dashboard-shell">
-      <header className="dashboard-header">
-        <Link className="brand" href="/dashboard">
-          Resurgo
-        </Link>
-        <nav aria-label="Case navigation">
-          <Link href={`/cases/${caseId}/discovery`}>Roadmap</Link>
-          <Link aria-current="page" href={`/cases/${caseId}/documents`}>
-            Documents
-          </Link>
-        </nav>
-      </header>
-      <section className="journey-header">
-        <p className="eyebrow">Private case · Secure documents</p>
-        <h1>Documents stay within their boundaries.</h1>
-        <p>
-          Upload a synthetic pilot document. Access remains case-scoped and each
-          professional needs an explicit document grant and applicable consent.
-        </p>
-      </section>
+    <main className="case-page document-page">
+      <CasePageHeader
+        eyebrow="Secure documents"
+        summary="Upload, organize, review, and version your case records. Files remain private and unavailable until security processing completes."
+        title="Documents"
+      />
       <div className="document-workspace">
-        <section aria-label="Upload document" className="document-panel">
-          <p className="eyebrow">New document</p>
-          <h2>Upload to quarantine</h2>
+        <section className="document-panel document-library-panel">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Private case library</p>
+              <h2>Your documents</h2>
+            </div>
+            <span>{documents.length} records</span>
+          </div>
+          <DocumentLibrary caseId={caseId} documents={documents} />
+        </section>
+        <section
+          aria-label="Upload document"
+          className="document-panel upload-panel"
+        >
+          <p className="eyebrow">Add documents</p>
+          <h2>Upload securely</h2>
+          <p>
+            Originals are retained as immutable versions. A replacement creates
+            a new version and never overwrites the prior file.
+          </p>
           <DocumentUploadForm caseId={caseId} />
         </section>
-        <section className="document-panel">
-          <p className="eyebrow">Case library</p>
-          <h2>Document versions</h2>
-          {documents.length === 0 ? (
-            <p>No documents have been added to this private case.</p>
-          ) : (
-            <ol className="document-list">
-              {documents.map((document) => {
-                const available = document.processing_status === "available";
-                const resource = `/api/cases/${caseId}/documents/${document.document_id}/versions/${document.version_id}`;
-                return (
-                  <li key={document.document_id}>
-                    <div>
-                      <h3>{document.title}</h3>
-                      <p>
-                        {document.format.toUpperCase()} · Version{" "}
-                        {document.version_number} ·{" "}
-                        {document.confidentiality.replaceAll("_", " ")}
-                      </p>
-                    </div>
-                    <span
-                      className={`document-status status-${document.processing_status}`}
-                    >
-                      {document.processing_status.replaceAll("_", " ")}
-                    </span>
-                    {available && document.format === "pdf" && (
-                      <Link href={`${resource}?preview=true`}>Preview</Link>
-                    )}
-                    {available && <Link href={resource}>Download</Link>}
-                  </li>
-                );
-              })}
-            </ol>
-          )}
-        </section>
-        <section aria-label="Document requests" className="document-panel">
+        <section
+          aria-label="Document requests"
+          className="document-panel request-panel"
+          id="requests"
+        >
           <p className="eyebrow">Document requests</p>
           <h2>Track what is still needed</h2>
           <DocumentRequestForm caseId={caseId} />

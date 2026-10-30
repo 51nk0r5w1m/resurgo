@@ -33,15 +33,10 @@ export async function GET(
       operation: preview ? "view" : "download",
       userId: session.user.id,
     });
-    if (preview && version.format !== "pdf") {
-      return Response.json(
-        { error: "Preview is not available for this format" },
-        { status: 409 },
-      );
-    }
     const keys = documentObjectKeys(identifiers);
+    const previewKey = version.format === "pdf" ? keys.preview : keys.available;
     const body = await getPrivateObjectStorage().get(
-      preview ? keys.preview : keys.available,
+      preview ? previewKey : keys.available,
       preview ? 50 * 1024 * 1024 : maximumDocumentBytes,
     );
     // Object reads are not part of the database transaction. Revalidate after
@@ -61,8 +56,8 @@ export async function GET(
     return new Response(Buffer.from(body), {
       headers: {
         "cache-control": "private, no-store, max-age=0",
-        "content-disposition": `${preview ? "inline" : "attachment"}; filename="resurgo-document.${preview ? "pdf" : version.format}"`,
-        "content-type": preview ? "application/pdf" : version.mimeType,
+        "content-disposition": `${preview ? "inline" : "attachment"}; filename="resurgo-document.${version.format}"`,
+        "content-type": preview ? version.mimeType : version.mimeType,
         "content-security-policy": "default-src 'none'; sandbox",
         "x-content-type-options": "nosniff",
       },

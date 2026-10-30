@@ -1,6 +1,8 @@
 # Dependencies and build output
 node_modules/
 .next/
+apps/web/public/docxodus/
+artifacts/
 dist/
 coverage/
 playwright-report/

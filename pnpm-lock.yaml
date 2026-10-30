@@ -188,6 +188,9 @@ catalogs:
     better-auth:
       specifier: 1.7.14
       version: 1.7.14
+    docxodus:
+      specifier: 12.6.2
+      version: 12.6.2
     fast-xml-parser:
       specifier: 5.11.2
       version: 5.11.2
@@ -203,6 +206,9 @@ catalogs:
     pg:
       specifier: 8.23.1
       version: 8.23.1
+    react-docxodus-viewer:
+      specifier: 0.7.0
+      version: 0.7.0
     tsx:
       specifier: 4.23.15
       version: 4.23.15
@@ -308,6 +314,9 @@ importers:
       better-auth:
         specifier: 'catalog:'
         version: 1.7.14(drizzle-kit@0.31.11)(drizzle-orm@0.45.4(@types/pg@8.23.1)(kysely@0.29.7)(pg@8.23.1))(next@16.4.3(@babel/core@7.29.7(supports-color@7.2.0))(@playwright/test@1.64.1)(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(pg@8.23.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(vitest@4.1.12(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)))
+      docxodus:
+        specifier: 'catalog:'
+        version: 12.6.2(react@19.3.1)
       lucide-react:
         specifier: 1.64.0
         version: 1.64.0(@types/react@19.3.0)(react@19.3.1)
@@ -317,9 +326,15 @@ importers:
       nodemailer:
         specifier: 'catalog:'
         version: 10.3.1
+      pdfjs-dist:
+        specifier: 'catalog:'
+        version: 6.4.299
       react:
         specifier: 19.3.1
         version: 19.3.1
+      react-docxodus-viewer:
+        specifier: 'catalog:'
+        version: 0.7.0(docxodus@12.6.2(react@19.3.1))(react@19.3.1)
       react-dom:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
@@ -439,6 +454,15 @@ packages:
   '@alloc/quick-lru@5.3.0':
     resolution: {integrity: sha512-U4+70Pc5ZS9osnCBCE5Jha/ciHM+Yp+CNMNC/7HvYbNRk1Ldd+f7qO65W5qfhu/TCv+/ozljlXXe9Nj8419DMA==}
     engines: {node: '>=10'}
+
+  '@atlaskit/pragmatic-drag-and-drop-auto-scroll@3.2.1':
+    resolution: {integrity: sha512-2fhWAG48EjPoKhoHLG6RcT3/VaCzYEbRb6BtA/Vcfx4FrL0P1KrEgBJ6OAwB0X8MOV6UH22YgjFFHjv8fQD9rA==}
+
+  '@atlaskit/pragmatic-drag-and-drop@2.0.2':
+    resolution: {integrity: sha512-ou1j+lBqutK7p2S80lMresJeKu9qAL1zr1K+N0OyCTzbMpD6pXRHray8VkRoHgJICI7Wp1fk5ScJh6EctyAuPw==}
+
+  '@atlaskit/pragmatic-drag-and-drop@4.0.0':
+    resolution: {integrity: sha512-pyDo2B5NiaExoKGmgeXKGNUL4aR4UzzSZm8QWWjYTEyBLVqSqKyKUwtVxMw2YEkakagOGFONUdHM32LAH2nPug==}
 
   '@aws-sdk/checksums@3.1001.7':
     resolution: {integrity: sha512-hUlYwqlsiDuPyhI5nQLgLZYKo0bFvMKaVk9JRfpb9S2kXxT2ZhyHZ5RTfH3PBpD3dMnDkGrA0/aY1AeAMFLmrQ==}
@@ -566,6 +590,10 @@ packages:
     resolution: {integrity: sha512-OZ6+oaK7GMyg3IfCpj8JOmn8n+w2rJbDT0LLfVDTLb1ZFeKDh3AiNELgCMUw175IJHSkLl74hG0M0VLsvx+gag==}
     engines: {node: '>=6.0.0'}
     hasBin: true
+
+  '@babel/runtime@7.29.10':
+    resolution: {integrity: sha512-NpugTzbKgGrNe45Ui32cN8vCFFMxVtP/9rtfwv0nP5FRDAjvYBxJcLVpYA9mr1jxP6cnIT7x9LUzuDTbWYYNRA==}
+    engines: {node: '>=6.9.0'}
 
   '@babel/template@7.29.7':
     resolution: {integrity: sha512-puq+Gf35oI24FeN11LkoUQFqv9uwNeWpxXZi/Ji3rRIoKAzKnxRaZ+Gkj0vKS9ZCiTESfng1N9LyOyXvo+m+Gg==}
@@ -2066,6 +2094,9 @@ packages:
       zod:
         optional: true
 
+  bind-event-listener@3.0.0:
+    resolution: {integrity: sha512-PJvH288AWQhKs2v9zyfYdPzlPqf5bXbGMmhmUIY9x4dAUGIWgomO771oBQNwJnMQSnUIXhKu6sgzpBRXTlvb8Q==}
+
   bowser@2.15.0:
     resolution: {integrity: sha512-xic6KSZglg/I4ymp45fdM4GWfYpBK79Fxd/TOvJktlaPgQqqDxvmGwOPZl2V0dyeS3Lj5c180bLhXF43iyAjZQ==}
 
@@ -2198,6 +2229,14 @@ packages:
   doctrine@2.1.0:
     resolution: {integrity: sha512-35mSku4ZXK0vfCuHEDAwt55dg2jNajHZ1odvF+8SSr82EsZY4QmXfuWso8oEd8zRhVObSN18aM0CjSdoBX7zIw==}
     engines: {node: '>=0.10.0'}
+
+  docxodus@12.6.2:
+    resolution: {integrity: sha512-siYwg1RNtjWsQFefhY0L7Yhj7F/kviHjY/78MNfkc8ZA2FOKnIpXakqsfbNHfqPBpCa4VvV6rsLMexgROTyKdg==}
+    peerDependencies:
+      react: '>=16.8.0'
+    peerDependenciesMeta:
+      react:
+        optional: true
 
   dotenv-cli@11.1.0:
     resolution: {integrity: sha512-YUBODAS0puvSc9bGdu07o1GSouVn63xDazqZqvT99Hta4nPqZ1jTdBcz12dDdxSC9jYbVlpWlnu0IJaMR8TIEQ==}
@@ -3355,6 +3394,15 @@ packages:
   queue-microtask@1.2.3:
     resolution: {integrity: sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==}
 
+  raf-schd@4.0.3:
+    resolution: {integrity: sha512-tQkJl2GRWh83ui2DiPTJz9wEiMN20syf+5oKfB03yYP7ioZcJwsIK8FjrtLwH1m7C7e+Tt2yYBlrOpdT+dyeIQ==}
+
+  react-docxodus-viewer@0.7.0:
+    resolution: {integrity: sha512-3wcN640rdhrHVQMHfA6omr59KGMMNcVA9FIdiWSiLJZfGqhPAqJ90dXBwTrDvmCd2w+OcbxgFEPFdyf2ZoDzkw==}
+    peerDependencies:
+      docxodus: '>=7.0'
+      react: '>=18'
+
   react-dom@19.3.1:
     resolution: {integrity: sha512-Y0bARz53lhEC1NMCASs0/j+faB/zqt3R8hpvg1e8+61ZVJ4UL0UdC4cBbXfZMcIuhrfgeILTLe+ZeBCavQPtKQ==}
     peerDependencies:
@@ -3802,6 +3850,23 @@ snapshots:
 
   '@alloc/quick-lru@5.3.0': {}
 
+  '@atlaskit/pragmatic-drag-and-drop-auto-scroll@3.2.1':
+    dependencies:
+      '@atlaskit/pragmatic-drag-and-drop': 4.0.0
+      '@babel/runtime': 7.29.10
+
+  '@atlaskit/pragmatic-drag-and-drop@2.0.2':
+    dependencies:
+      '@babel/runtime': 7.29.10
+      bind-event-listener: 3.0.0
+      raf-schd: 4.0.3
+
+  '@atlaskit/pragmatic-drag-and-drop@4.0.0':
+    dependencies:
+      '@babel/runtime': 7.29.10
+      bind-event-listener: 3.0.0
+      raf-schd: 4.0.3
+
   '@aws-sdk/checksums@3.1001.7':
     dependencies:
       '@aws-sdk/core': 3.978.7
@@ -4043,6 +4108,8 @@ snapshots:
   '@babel/parser@7.29.11':
     dependencies:
       '@babel/types': 7.29.11
+
+  '@babel/runtime@7.29.10': {}
 
   '@babel/template@7.29.7':
     dependencies:
@@ -5187,6 +5254,8 @@ snapshots:
     optionalDependencies:
       zod: 4.6.7
 
+  bind-event-listener@3.0.0: {}
+
   bowser@2.15.0: {}
 
   brace-expansion@1.1.21:
@@ -5319,6 +5388,13 @@ snapshots:
   doctrine@2.1.0:
     dependencies:
       esutils: 2.0.3
+
+  docxodus@12.6.2(react@19.3.1):
+    dependencies:
+      '@atlaskit/pragmatic-drag-and-drop': 2.0.2
+      '@atlaskit/pragmatic-drag-and-drop-auto-scroll': 3.2.1
+    optionalDependencies:
+      react: 19.3.1
 
   dotenv-cli@11.1.0:
     dependencies:
@@ -6476,6 +6552,13 @@ snapshots:
   punycode@2.3.1: {}
 
   queue-microtask@1.2.3: {}
+
+  raf-schd@4.0.3: {}
+
+  react-docxodus-viewer@0.7.0(docxodus@12.6.2(react@19.3.1))(react@19.3.1):
+    dependencies:
+      docxodus: 12.6.2(react@19.3.1)
+      react: 19.3.1
 
   react-dom@19.3.1(react@19.3.1):
     dependencies:

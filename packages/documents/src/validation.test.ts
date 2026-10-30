@@ -73,6 +73,19 @@ describe("document structural validation", () => {
     ).resolves.toMatchObject({ format: "docx" });
   });
 
+  it("rejects external OOXML relationships", async () => {
+    await expect(
+      validateDocumentStructure(
+        await syntheticDocx({
+          name: "word/_rels/document.xml.rels",
+          content:
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Target="https://example.invalid/tracker" TargetMode="External" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"/></Relationships>',
+        }),
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ),
+    ).rejects.toThrow("External OOXML relationships are not permitted");
+  });
+
   it("creates a raster-only PDF preview with the same page count", async () => {
     const source = await syntheticPdf();
     const preview = await createRasterizedPdfPreview(source);
