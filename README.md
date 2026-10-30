@@ -1,4 +1,4 @@
-# Resurgo
+# resurgo
 
 `Navigate today. Build tomorrow.`
 
