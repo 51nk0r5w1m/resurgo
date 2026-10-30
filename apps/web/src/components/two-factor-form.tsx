@@ -14,13 +14,18 @@ export function TwoFactorChallenge() {
     const data = new FormData(event.currentTarget);
     const code = String(data.get("code") ?? "").trim();
     const backup = data.get("backup") === "on";
-    const result = backup
+    try {
+      const result = backup
       ? await authClient.twoFactor.verifyBackupCode({ code })
-      : await authClient.twoFactor.verifyTotp({ code, trustDevice: false });
-    if (result.error) {
+    : await authClient.twoFactor.verifyTotp({ code, trustDevice: false });
+      if (result.error) {
       setMessage("That verification code is not valid.");
-      return;
-    }
+    return;
+  }
+} catch {
+  setMessage("We couldn't verify your code. Please try again.");
+  return;
+}
     router.push("/dashboard");
     router.refresh();
   }
