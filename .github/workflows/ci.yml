@@ -94,7 +94,18 @@ jobs:
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Run browser tests
-        run: pnpm test:e2e
+        run: |
+          pnpm --filter @resurgo/document-worker start > "${RUNNER_TEMP}/document-worker.log" 2>&1 &
+          document_worker_pid=$!
+          cleanup() {
+            kill "${document_worker_pid}" 2>/dev/null || true
+            wait "${document_worker_pid}" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          pnpm test:e2e || {
+            cat "${RUNNER_TEMP}/document-worker.log"
+            exit 1
+          }
       - name: Audit dependencies
         run: pnpm audit --audit-level moderate
 
