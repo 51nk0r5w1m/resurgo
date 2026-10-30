@@ -47,10 +47,12 @@ Organizations and cases are deliberately different security boundaries:
 Phase B1 includes narrow server-domain decisions for effective case and resource
 access. They re-evaluate case and organization membership lifecycle, pilot
 organization status, requested operation, consent/grant lifecycle, and time
-bounds for each decision. Revoked or expired grants remain historical evidence
-and never authorize access. RES-010 must still bind these decisions to an
-authenticated principal and every request route; a row identifier supplied by a
-client is never proof of access.
+bounds for each decision. Paused and closed cases fail closed. The database and
+policy layer both restrict `case_owner` grant basis to the case's owner
+membership. Revoked or expired grants remain historical evidence and never
+authorize access. RES-010 must still bind these decisions to an authenticated
+principal and every request route; a row identifier supplied by a client is
+never proof of access.
 
 Audit hashes are shape-checked and unique, but Phase B1 does not yet compute or
 verify a tamper-evident chain. Database roles are also not yet split between

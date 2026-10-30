@@ -1,6 +1,7 @@
 # v0.1 security-boundary data model
 
-**Status:** Phase B1 implemented through migration `0003_swift_stature.sql`.
+**Status:** Phase B1 implemented through migration
+`0004_enforce_owner_grants.sql`.
 **Tickets:** RES-003, RES-010 through RES-016, RES-018 through RES-021, RES-040
 
 ## Ownership and authorization rules
@@ -22,8 +23,10 @@
   `resource_grant` addressed to one case membership. Grants are never addressed
   to an organization in v0.1.
 - Authorization re-evaluates current case membership, professional affiliation,
-  pilot organization status, consent, grant status, and all effective/expiry
-  bounds. A historical row alone never proves access.
+  pilot organization status, case status, consent, grant status, and all
+  effective/expiry bounds. A historical row alone never proves access.
+- `case_owner` grant basis is valid only for the case's owner membership. Other
+  case members require a grant backed by explicit consent.
 - Consent and access are distinct. A disclosure authorization records the
   client's instruction and purpose; a grant is the technical permission. Policy
   may deny a grant even when consent exists because professional duties or legal

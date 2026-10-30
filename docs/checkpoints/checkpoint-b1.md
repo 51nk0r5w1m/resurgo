@@ -24,7 +24,7 @@ schema prerequisites
 - current-state case/resource authorization decisions that fail closed when a
   professional organization, affiliation, case membership, grant, or consent is
   no longer effective
-- clean-database schema/trigger validation and ten PostgreSQL integration tests
+- clean-database schema/trigger validation and eleven PostgreSQL integration tests
 
 ## Security evidence
 
@@ -42,6 +42,8 @@ The integration suite proves that:
 - suspending a pilot organization or revoking an organization membership removes
   effective professional access on the next authorization decision;
 - revoked consent and revoked or expired grants do not authorize access;
+- paused or closed cases do not authorize case or resource access;
+- `case_owner` grant basis is rejected for non-owner memberships;
 - a replacement grant receives a new row while revoked and expired history is
   retained;
 - audit events can be inserted but cannot be updated or deleted.
