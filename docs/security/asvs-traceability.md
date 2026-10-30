@@ -55,3 +55,19 @@ exists and remains subject to RES-004 review:
 | `v5.0.0-13.3.2` least privilege           | loopback service exposure, Garage admin port withheld, container `no-new-privileges`                         | Partial; separate PostgreSQL roles deferred    |
 | `v5.0.0-15.1.2` component inventory       | exact direct versions/licenses, frozen lockfile, explicit install-script allowlist, moderate-threshold audit | Implemented evidence; SBOM generation deferred |
 | `v5.0.0-16.5.1` safe configuration errors | environment error formatter reports field names without rejected secret values                               | Partial; application error boundary deferred   |
+
+## Checkpoint B1 evidence
+
+No requirement is marked verified. Phase B1 adds the following automated,
+partial evidence; RES-010 must add request-level deny-by-default tests before any
+authorization requirement can be considered for verification.
+
+| Requirement                      | Current evidence                                                                                                      | Status                                           |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `v5.0.0-8.1.1`, `v5.0.0-8.1.2`   | ADR-0002 defines identity, organization, case, consent, grant, classification, operation, and lifecycle inputs        | Documented design; policy implementation absent  |
+| `v5.0.0-8.2.2`                   | PostgreSQL tests reject cross-case resource/consent references and prove grants address one case membership           | Partial database evidence; route tests absent    |
+| `v5.0.0-8.3.1`                   | Composite foreign keys and constraint triggers enforce case ownership and scoped references below the web layer       | Partial; centralized policy engine absent        |
+| `v5.0.0-8.4.1`                   | Tests reject unverified professional participation and prove one organization member does not inherit another's grant | Partial database evidence; query policy absent   |
+| `v5.0.0-14.1.1`, `v5.0.0-14.1.2` | Resource classification enum separates shared, legal, financial, personal-support, and health-related envelopes       | Schema evidence; field projection tests absent   |
+| `v5.0.0-16.2.1`, `v5.0.0-16.2.5` | Audit schema limits event fields to actor/action/target/outcome/reason/correlation/integrity metadata                 | Schema evidence; emission/redaction tests absent |
+| `v5.0.0-16.4.2`                  | Integration test proves the database rejects audit-event update and delete; hash fields are format-checked and unique | Partial; hash-chain verification deferred        |

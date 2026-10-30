@@ -59,7 +59,8 @@ The repository contains planning and brand assets only. The feature branch and
 
 - Node.js and pnpm versions, a committed lockfile policy, and exact dependency
   versions/licenses
-- Supported jurisdiction set and governance for approving rule content
+- Rule-content approval governance (the B1 pilot jurisdiction set is now limited
+  to Fulton and DeKalb Superior Courts)
 - Better Auth email transport, trusted-origin configuration, password/session
   policy, recovery behavior, and production rate-limit store
 - Canonical policy actions, principal types, classifications, purposes, and the

@@ -27,6 +27,7 @@
     "setup:local": "pnpm env:init && pnpm env:check && pnpm infra:up && pnpm db:migrate",
     "start": "dotenv -e .env -- pnpm --filter @resurgo/web start",
     "test": "vitest run",
+    "test:integration": "dotenv -e .env -- vitest run --config vitest.integration.config.ts",
     "test:e2e": "playwright test",
     "typecheck": "pnpm --recursive --if-present typecheck"
   },

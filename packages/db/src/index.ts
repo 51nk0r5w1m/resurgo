@@ -9,4 +9,5 @@ export function createDatabase(databaseUrl: string) {
   return { db, pool };
 }
 
+export * from "./domain/cases";
 export * from "./schema";

@@ -6,6 +6,12 @@ export default defineConfig({
       enabled: false,
     },
     environment: "node",
+    exclude: [
+      "**/.next/**",
+      "**/dist/**",
+      "**/node_modules/**",
+      "**/*.integration.test.ts",
+    ],
     include: ["apps/**/*.test.ts", "packages/**/*.test.ts"],
   },
 });

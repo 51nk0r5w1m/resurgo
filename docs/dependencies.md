@@ -1,6 +1,6 @@
 # Dependency inventory
 
-**Reviewed:** 2026-10-29
+**Reviewed:** 2026-10-30
 **Policy:** Direct dependencies and critical infrastructure use exact versions.
 The lockfile is authoritative for transitive versions. CI produces dependency
 audit evidence; this inventory is not a vulnerability-free claim.
@@ -40,9 +40,11 @@ Type packages use their corresponding published MIT licenses:
 `@types/node` 26.6.6, `@types/react` 19.3.0, and `@types/react-dom`
 19.3.0.
 
-Better Auth, PDF.js, pdf-lib, S3 SDK, and ClamAV client packages are intentionally
-not installed in Checkpoint A. They will be pinned when their implementation
-tickets begin.
+The Phase B1 identity schema targets Better Auth 1.7.14 (MIT), the current stable
+release reviewed on 2026-10-30. The runtime and Drizzle adapter are intentionally
+not installed until RES-006 begins; adapter schema validation is an acceptance
+gate for that ticket. PDF.js, pdf-lib, S3 SDK, and ClamAV client packages remain
+uninstalled until their implementation tickets begin.
 
 ## Local infrastructure
 

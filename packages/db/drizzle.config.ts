@@ -13,7 +13,7 @@ export default defineConfig({
   dialect: "postgresql",
   out: "./drizzle",
   schema: "./src/schema/index.ts",
-  schemaFilter: ["resurgo"],
+  schemaFilter: ["auth", "resurgo"],
   strict: true,
   verbose: true,
 });

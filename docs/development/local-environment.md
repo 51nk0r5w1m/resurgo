@@ -1,13 +1,13 @@
-# Proposed local development environment
+# Local development environment
 
-**Status:** Implemented for Checkpoint A (RES-001/RES-002 foundation).
+**Status:** Implemented through Checkpoint B1 (RES-001/RES-002/RES-003).
 
 ## Runtime topology
 
 | Component                  | Local exposure                             | Identity and data boundary                                                                    |
 | -------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------- |
 | Next.js web                | loopback application port                  | application DB role; session secret; quarantine write/released read through storage adapter   |
-| PostgreSQL                 | loopback only                              | separate migration, application, worker, and test roles                                       |
+| PostgreSQL                 | loopback only                              | one local owner role currently; runtime/migration/audit role separation is a later gate       |
 | S3-compatible object store | API on loopback; admin UI opt-in           | distinct web/worker credentials; private quarantine and released buckets; no anonymous policy |
 | ClamAV daemon              | deferred to document-processing checkpoint | will accept streams from the worker only; no host port                                        |
 | Document worker            | deferred to document-processing checkpoint | will have no inbound host port or auth/session secrets                                        |

@@ -4,6 +4,11 @@
 
 Resurgo is an open-source-first divorce transition coordination platform. Its purpose is to replace fragmented email chains with guided discovery, personalized case roadmaps, secure document exchange, and carefully scoped professional handoffs.
 
+The v0.1 pilot is limited to divorce-related mortgage and property transition
+coordination in the Atlanta, Georgia area. Fulton and DeKalb Superior Courts are
+the only enabled jurisdictions. Outputs require qualified legal or mortgage
+professional review and are not authoritative advice or eligibility decisions.
+
 ## Product boundaries
 
 The platform coordinates legal, financial, housing, and personal-support workflows. It does not itself practice law, underwrite loans, or provide clinical care. Information exchange is explicit, purpose-limited, and auditable.
@@ -20,13 +25,14 @@ Discovery to Documents: identity, case creation, guided intake, deterministic se
 - v0.5: Docassemble/Suffolk Assembly Line and jurisdiction-specific document packages
 - Later: authorized court filing adapters and regulated provider integrations
 
-## Checkpoint A foundation
+## Checkpoint B1 foundation
 
 The repository is a pnpm modular monolith with a Next.js App Router application,
 shared configuration/UI/database packages, PostgreSQL with Drizzle migrations,
-and private Garage object storage for local development. Identity, case data, and
-document handling are deliberately not implemented until their authorization
-boundaries are in place.
+and private Garage object storage for local development. Phase B1 adds the
+Better Auth-compatible identity schema and separate organization, case,
+classified-resource, consent/grant, and audit boundaries. Authentication and
+document handling are deliberately not implemented yet.
 
 ### Prerequisites
 
@@ -66,6 +72,7 @@ pnpm format:check
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm test:integration
 pnpm db:validate
 pnpm build
 pnpm exec playwright install chromium
@@ -74,8 +81,10 @@ pnpm audit --audit-level moderate
 ```
 
 `pnpm db:validate` creates a temporary empty database, applies every migration,
-asserts the expected foundation relation, and drops the database. CI runs the same
-quality gates and a Gitleaks secret scan.
+asserts all expected relations and security triggers, and drops the database. The
+integration suite creates another isolated temporary database and proves the B1
+cross-case, cross-organization, consent-scope, ownership, and audit invariants.
+CI runs the same quality gates and a Gitleaks secret scan.
 
 ### Local operations
 

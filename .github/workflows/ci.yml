@@ -70,6 +70,10 @@ jobs:
         run: pnpm test
       - name: Validate migrations on an empty database
         run: pnpm db:validate
+      - name: Apply migrations for integration tests
+        run: pnpm db:migrate
+      - name: Run database integration tests
+        run: pnpm test:integration
       - name: Build application
         run: pnpm build
       - name: Install Chromium
