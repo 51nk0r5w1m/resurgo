@@ -450,24 +450,6 @@ export async function addDocumentVersion(
         versionNumber: latest.version_number + 1,
       })
       .returning();
-    await transaction
-      .insert(documentContributors)
-      .values({
-        caseId: input.caseId,
-        caseMembershipId: authorization.caseMembershipId,
-        documentId: input.documentId,
-        role: "version_author",
-        status: "active",
-      })
-      .onConflictDoUpdate({
-        target: [
-          documentContributors.caseId,
-          documentContributors.documentId,
-          documentContributors.caseMembershipId,
-          documentContributors.role,
-        ],
-        set: { status: "active" },
-      });
     if (!version) throw new Error("Document version creation failed");
     await invalidateReviewsForEvidenceChange(transaction, {
       actorCaseMembershipId: authorization.caseMembershipId,
@@ -610,12 +592,22 @@ export async function grantDocumentAccess(
         )
         .limit(1);
       if (!activeContributor) {
-        await transaction.insert(documentContributors).values({
-          caseId: input.caseId,
-          caseMembershipId: input.granteeCaseMembershipId,
-          documentId: input.documentId,
-          role: "uploader",
-        });
+        await transaction
+          .insert(documentContributors)
+          .values({
+            caseId: input.caseId,
+            caseMembershipId: input.granteeCaseMembershipId,
+            documentId: input.documentId,
+            role: "uploader",
+          })
+          .onConflictDoNothing({
+            target: [
+              documentContributors.documentId,
+              documentContributors.caseMembershipId,
+              documentContributors.role,
+            ],
+            where: sql`${documentContributors.status} = 'active'`,
+          });
       }
     }
     await transaction.insert(auditEvents).values(

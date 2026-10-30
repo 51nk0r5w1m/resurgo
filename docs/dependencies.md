@@ -42,6 +42,7 @@ this compatibility override.
 | PDF.js                         |     6.4.299 | Apache-2.0   | Sandboxed PDF parsing and client rendering                    |
 | pdf-lib                        |      1.17.1 | MIT          | Server-side PDF structural parsing/manipulation               |
 | ZIP.js                         |      2.24.0 | BSD-3-Clause | Bounded native DOCX/OOXML archive inspection                  |
+| fast-xml-parser                |      5.11.2 | MIT          | Required DOCX XML-part parsing and structural validation      |
 | `@napi-rs/canvas`              |      1.0.13 | MIT          | Worker-only PDF page rasterization                            |
 | tsx                            |     4.23.15 | MIT          | Worker TypeScript runtime with ESM workspace resolution       |
 

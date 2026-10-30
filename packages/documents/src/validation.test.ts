@@ -17,10 +17,15 @@ async function syntheticDocx(extra?: { name: string; content: string }) {
   await writer.add(
     "[Content_Types].xml",
     new TextReader(
-      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>',
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>',
     ),
   );
-  await writer.add("word/document.xml", new TextReader("<w:document/>"));
+  await writer.add(
+    "word/document.xml",
+    new TextReader(
+      '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>',
+    ),
+  );
   if (extra) await writer.add(extra.name, new TextReader(extra.content));
   return new Uint8Array(await (await writer.close()).arrayBuffer());
 }
@@ -40,6 +45,19 @@ async function syntheticDocxWithDuplicateEntry() {
     offset = bytes.indexOf(sourceName, offset + sourceName.length);
   }
   return new Uint8Array(bytes);
+}
+
+async function syntheticDocxWithInvalidRequiredParts() {
+  const writer = new ZipWriter(new BlobWriter());
+  await writer.add(
+    "[Content_Types].xml",
+    new TextReader("synthetic non-XML content"),
+  );
+  await writer.add(
+    "word/document.xml",
+    new TextReader("synthetic non-XML document"),
+  );
+  return new Uint8Array(await (await writer.close()).arrayBuffer());
 }
 
 describe("document structural validation", () => {
@@ -99,6 +117,12 @@ describe("document structural validation", () => {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       ),
     ).rejects.toThrow(/duplicate entry/u);
+    await expect(
+      validateDocumentStructure(
+        await syntheticDocxWithInvalidRequiredParts(),
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ),
+    ).rejects.toThrow(/Required OOXML parts/u);
   });
 
   it("derives only opaque, server-owned private object keys", () => {

@@ -1351,6 +1351,7 @@ describe("immutable document and professional review foundations", () => {
       }),
     ).resolves.toMatchObject([
       {
+        evidence: [],
         professionalReviewId: review.review.id,
         status: "completed",
       },

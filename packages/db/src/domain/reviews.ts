@@ -101,6 +101,7 @@ const transitions: Record<ReviewStatus, readonly ReviewStatus[]> = {
 async function evidenceRows(
   database: Database,
   caseId: string,
+  classification: Classification,
   evidence: EvidenceReference[],
 ) {
   const identifiers = evidence.map(
@@ -116,6 +117,7 @@ async function evidenceRows(
         documentId: documents.id,
         documentVersionId: documentVersions.id,
         resourceId: documents.caseResourceId,
+        classification: caseResources.classification,
       })
       .from(documentVersions)
       .innerJoin(
@@ -123,6 +125,13 @@ async function evidenceRows(
         and(
           eq(documents.id, documentVersions.documentId),
           eq(documents.caseId, documentVersions.caseId),
+        ),
+      )
+      .innerJoin(
+        caseResources,
+        and(
+          eq(caseResources.caseId, documents.caseId),
+          eq(caseResources.id, documents.caseResourceId),
         ),
       )
       .where(
@@ -133,7 +142,9 @@ async function evidenceRows(
         ),
       )
       .limit(1);
-    if (!row) throw new AuthorizationDeniedError();
+    if (!row || row.classification !== classification) {
+      throw new AuthorizationDeniedError();
+    }
     rows.push({ ...row, purpose: reference.purpose });
   }
   return rows;
@@ -251,6 +262,7 @@ export async function createProfessionalReview(
     const evidence = await evidenceRows(
       transaction,
       input.caseId,
+      input.classification,
       input.evidence,
     );
     if (input.subjectType === "document_set" && evidence.length === 0) {
@@ -302,19 +314,56 @@ export async function createProfessionalReview(
       .returning();
     if (!resource) throw new Error("Review resource creation failed");
     if (input.supersedesReviewId != null) {
-      const [supersededReview] = await transaction
-        .select({ id: professionalReviews.id })
-        .from(professionalReviews)
-        .where(
-          and(
-            eq(professionalReviews.id, input.supersedesReviewId),
-            eq(professionalReviews.caseId, input.caseId),
-          ),
-        )
-        .limit(1);
-      if (!supersededReview) {
+      const previous = await transaction.execute<{
+        decision_context: string;
+        review_scope: string;
+        revision: number;
+        revision_id: string;
+        status: ReviewStatus;
+      }>(sql`
+        select revision.id as revision_id, revision.revision, revision.status,
+          revision.decision_context, revision.review_scope
+        from resurgo.professional_reviews review
+        inner join lateral (
+          select id, revision, status, decision_context, review_scope
+          from resurgo.professional_review_revisions
+          where case_id = review.case_id
+            and professional_review_id = review.id
+          order by revision desc
+          limit 1
+        ) revision on true
+        where review.id = ${input.supersedesReviewId}
+          and review.case_id = ${input.caseId}
+        for update of review
+      `);
+      const latestPrevious = previous.rows[0];
+      if (!latestPrevious) {
         throw new Error("Superseded review must belong to the same case");
       }
+      if (!transitions[latestPrevious.status].includes("superseded")) {
+        throw new Error("Superseded review is not active");
+      }
+      await transaction.insert(professionalReviewRevisions).values({
+        caseId: input.caseId,
+        createdByCaseMembershipId: owner.caseMembershipId,
+        decisionContext: latestPrevious.decision_context,
+        professionalReviewId: input.supersedesReviewId,
+        reviewScope: latestPrevious.review_scope,
+        revision: latestPrevious.revision + 1,
+        status: "superseded",
+        supersedesRevisionId: latestPrevious.revision_id,
+      });
+      await transaction.insert(auditEvents).values(
+        buildAuditEvent({
+          action: "professional_review.superseded",
+          actorType: "user",
+          actorUserId: input.userId,
+          caseId: input.caseId,
+          outcome: "success",
+          resourceId: input.supersedesReviewId,
+          resourceType: "professional_review",
+        }),
+      );
     }
     const [review] = await transaction
       .insert(professionalReviews)
@@ -401,8 +450,20 @@ export async function appendProfessionalReviewRevision(
 ) {
   return database.transaction(async (transaction) => {
     const [review] = await transaction
-      .select()
+      .select({
+        caseResourceId: professionalReviews.caseResourceId,
+        classification: caseResources.classification,
+        responsibleCaseMembershipId:
+          professionalReviews.responsibleCaseMembershipId,
+      })
       .from(professionalReviews)
+      .innerJoin(
+        caseResources,
+        and(
+          eq(caseResources.caseId, professionalReviews.caseId),
+          eq(caseResources.id, professionalReviews.caseResourceId),
+        ),
+      )
       .where(
         and(
           eq(professionalReviews.caseId, input.caseId),
@@ -458,6 +519,7 @@ export async function appendProfessionalReviewRevision(
     const evidence = await evidenceRows(
       transaction,
       input.caseId,
+      review.classification,
       input.evidence,
     );
     await requireEvidenceAccess(
@@ -631,12 +693,13 @@ export async function listAuthorizedProfessionalReviews(
     ) {
       continue;
     }
-    const [evidence, statements] = await Promise.all([
+    const [candidateEvidence, statements] = await Promise.all([
       database
         .select({
           documentId: professionalReviewEvidence.documentId,
           documentVersionId: professionalReviewEvidence.documentVersionId,
           purpose: professionalReviewEvidence.purpose,
+          resourceId: documents.caseResourceId,
           title: documents.title,
           versionNumber: documentVersions.versionNumber,
         })
@@ -672,6 +735,25 @@ export async function listAuthorizedProfessionalReviews(
           ),
         ),
     ]);
+    const evidence = [];
+    for (const candidate of candidateEvidence) {
+      if (
+        await hasEffectiveResourceAccess(database, {
+          caseId: input.caseId,
+          operation: "view",
+          resourceId: candidate.resourceId,
+          userId: input.userId,
+        })
+      ) {
+        evidence.push({
+          documentId: candidate.documentId,
+          documentVersionId: candidate.documentVersionId,
+          purpose: candidate.purpose,
+          title: candidate.title,
+          versionNumber: candidate.versionNumber,
+        });
+      }
+    }
     authorized.push({ ...row, evidence, statements });
   }
   return authorized;
@@ -881,18 +963,6 @@ export async function recordAttorneyReviewAcknowledgement(
         outcome: "success",
         resourceId: input.reviewRevisionId,
         resourceType: "professional_review_revision",
-      }),
-    );
-    await transaction.insert(auditEvents).values(
-      buildAuditEvent({
-        actorUserId: input.userId,
-        caseId: input.caseId,
-        eventType: `professional_review.${input.action}`,
-        metadata: {
-          professionalReviewId: input.professionalReviewId,
-          reviewRevisionId: input.reviewRevisionId,
-          statementHash: input.statementHash,
-        },
       }),
     );
     return event;

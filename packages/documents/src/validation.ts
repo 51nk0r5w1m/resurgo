@@ -1,9 +1,11 @@
 import { BlobReader, ZipReader } from "@zip.js/zip.js";
+import { XMLParser } from "fast-xml-parser";
 import { PDFDocument } from "pdf-lib";
 
 export const maximumDocumentBytes = 15 * 1024 * 1024;
 const maximumOoxmlEntries = 2_000;
 const maximumOoxmlUncompressedBytes = 75 * 1024 * 1024;
+const maximumRequiredXmlBytes = 2 * 1024 * 1024;
 
 export type ValidatedDocument = {
   format: "docx" | "pdf";
@@ -76,6 +78,7 @@ async function validateDocx(bytes: Uint8Array): Promise<ValidatedDocument> {
     }
     let uncompressedBytes = 0;
     const names = new Set<string>();
+    const requiredXml = new Map<string, Uint8Array>();
     for (const entry of entries) {
       if (
         entry.filename.startsWith("/") ||
@@ -87,13 +90,41 @@ async function validateDocx(bytes: Uint8Array): Promise<ValidatedDocument> {
       if (names.has(entry.filename)) {
         throw new Error("OOXML archive contains duplicate entry names");
       }
-      if (names.has(entry.filename)) {
-        throw new Error("OOXML archive contains duplicate filenames");
-      }
       names.add(entry.filename);
-      uncompressedBytes += entry.uncompressedSize;
-      if (uncompressedBytes > maximumOoxmlUncompressedBytes) {
-        throw new Error("OOXML expanded size exceeds the permitted range");
+      if (!entry.directory) {
+        const chunks: Uint8Array[] = [];
+        let requiredBytes = 0;
+        const captureRequired =
+          entry.filename === "[Content_Types].xml" ||
+          entry.filename === "word/document.xml";
+        await entry.getData(
+          new WritableStream<Uint8Array>({
+            write(chunk) {
+              uncompressedBytes += chunk.byteLength;
+              if (uncompressedBytes > maximumOoxmlUncompressedBytes) {
+                throw new Error(
+                  "OOXML expanded size exceeds the permitted range",
+                );
+              }
+              if (captureRequired) {
+                requiredBytes += chunk.byteLength;
+                if (requiredBytes > maximumRequiredXmlBytes) {
+                  throw new Error("Required OOXML part exceeds the size limit");
+                }
+                chunks.push(chunk.slice());
+              }
+            },
+          }),
+          { checkSignature: true },
+        );
+        if (captureRequired) {
+          requiredXml.set(
+            entry.filename,
+            new Uint8Array(
+              Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))),
+            ),
+          );
+        }
       }
     }
     if (
@@ -102,6 +133,46 @@ async function validateDocx(bytes: Uint8Array): Promise<ValidatedDocument> {
       names.has("word/vbaProject.bin")
     ) {
       throw new Error("OOXML document structure is not permitted");
+    }
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      removeNSPrefix: true,
+    });
+    let contentTypes: Record<string, unknown>;
+    let documentPart: Record<string, unknown>;
+    try {
+      contentTypes = parser.parse(
+        new TextDecoder("utf-8", { fatal: true }).decode(
+          requiredXml.get("[Content_Types].xml"),
+        ),
+      ) as Record<string, unknown>;
+      documentPart = parser.parse(
+        new TextDecoder("utf-8", { fatal: true }).decode(
+          requiredXml.get("word/document.xml"),
+        ),
+      ) as Record<string, unknown>;
+    } catch {
+      throw new Error("Required OOXML parts are not valid UTF-8 XML");
+    }
+    const types = contentTypes.Types as
+      { Override?: unknown | unknown[] } | undefined;
+    const overrides = Array.isArray(types?.Override)
+      ? types.Override
+      : types?.Override
+        ? [types.Override]
+        : [];
+    const declaresMainDocument = overrides.some(
+      (override) =>
+        typeof override === "object" &&
+        override !== null &&
+        "@_PartName" in override &&
+        override["@_PartName"] === "/word/document.xml" &&
+        "@_ContentType" in override &&
+        override["@_ContentType"] ===
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+    );
+    if (!declaresMainDocument || !("document" in documentPart)) {
+      throw new Error("Required OOXML parts do not describe a DOCX document");
     }
   } finally {
     await reader.close();
