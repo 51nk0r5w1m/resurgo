@@ -295,6 +295,21 @@ export async function createProfessionalReview(
       })
       .returning();
     if (!resource) throw new Error("Review resource creation failed");
+    if (input.supersedesReviewId != null) {
+      const [supersededReview] = await transaction
+        .select({ id: professionalReviews.id })
+        .from(professionalReviews)
+        .where(
+          and(
+            eq(professionalReviews.id, input.supersedesReviewId),
+            eq(professionalReviews.caseId, input.caseId),
+          ),
+        )
+        .limit(1);
+      if (!supersededReview) {
+        throw new Error("Superseded review must belong to the same case");
+      }
+    }
     const [review] = await transaction
       .insert(professionalReviews)
       .values({
