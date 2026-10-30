@@ -299,6 +299,9 @@ export async function completeDiscovery(
     if (session.status === "completed") {
       return getDiscoveryState(transaction, input);
     }
+    if (session.status !== "in_progress") {
+      throw new Error("Discovery session is not in progress");
+    }
     const answers = await latestAnswers(transaction, session.id);
     const missing = visibleDiscoveryQuestions(answers)
       .map(({ key }) => key)
