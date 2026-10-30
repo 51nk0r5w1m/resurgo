@@ -16,7 +16,7 @@ export interface CaseAccessInput {
 }
 
 export interface ResourceAccessInput extends CaseAccessInput {
-  operation: "view" | "download" | "share";
+  operation: "view" | "download" | "share" | "contribute";
   resourceId: string;
 }
 

@@ -64,6 +64,13 @@
       "when": 1793342170019,
       "tag": "0008_married_cerebro",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793344623419,
+      "tag": "0009_chunky_eddie_brock",
+      "breakpoints": true
     }
   ]
 }
