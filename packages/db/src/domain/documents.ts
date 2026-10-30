@@ -67,6 +67,7 @@ export async function createDocumentWithVersion(
     sourceReference?: string;
     title: string;
     userId: string;
+    recordInitialQuarantineEvent?: boolean;
   },
 ) {
   assertVersionMetadata(input);
@@ -118,13 +119,15 @@ export async function createDocumentWithVersion(
       .returning();
     if (!version) throw new Error("Document version creation failed");
 
-    await transaction.insert(documentProcessingEvents).values({
-      actorCaseMembershipId: authorization.caseMembershipId,
-      caseId: input.caseId,
-      documentId: document.id,
-      documentVersionId: version.id,
-      status: "quarantined",
-    });
+    if (input.recordInitialQuarantineEvent !== false) {
+      await transaction.insert(documentProcessingEvents).values({
+        actorCaseMembershipId: authorization.caseMembershipId,
+        caseId: input.caseId,
+        documentId: document.id,
+        documentVersionId: version.id,
+        status: "quarantined",
+      });
+    }
     await transaction.insert(documentContributors).values({
       caseId: input.caseId,
       caseMembershipId: authorization.caseMembershipId,
@@ -157,6 +160,189 @@ export async function createDocumentWithVersion(
     );
     return { document, resource, version };
   });
+}
+
+export async function recordDocumentProcessingEvent(
+  database: Database,
+  input: {
+    caseId: string;
+    documentId: string;
+    failureCode?: string;
+    status: "quarantined" | "rejected";
+    userId: string;
+    versionId: string;
+  },
+) {
+  return database.transaction(async (transaction) => {
+    const authorization = await requireCaseAuthorization(transaction, {
+      caseId: input.caseId,
+      operation: "manage",
+      userId: input.userId,
+    });
+    const [version] = await transaction
+      .select({ id: documentVersions.id })
+      .from(documentVersions)
+      .where(
+        and(
+          eq(documentVersions.caseId, input.caseId),
+          eq(documentVersions.documentId, input.documentId),
+          eq(documentVersions.id, input.versionId),
+        ),
+      )
+      .limit(1);
+    if (!version) throw new AuthorizationDeniedError();
+    const [event] = await transaction
+      .insert(documentProcessingEvents)
+      .values({
+        actorCaseMembershipId: authorization.caseMembershipId,
+        caseId: input.caseId,
+        documentId: input.documentId,
+        documentVersionId: input.versionId,
+        failureCode: input.failureCode,
+        status: input.status,
+      })
+      .returning();
+    return event;
+  });
+}
+
+export async function listAuthorizedDocuments(
+  database: Database,
+  input: { caseId: string; userId: string },
+) {
+  await requireCaseAuthorization(database, { ...input, operation: "read" });
+  const result = await database.execute<{
+    confidentiality: Confidentiality;
+    created_at: Date;
+    document_id: string;
+    format: DocumentFormat;
+    processing_status: string;
+    resource_id: string;
+    title: string;
+    version_id: string;
+    version_number: number;
+  }>(sql`
+    select document.id as document_id, document.title, document.format,
+      document.confidentiality, document.created_at, document.case_resource_id as resource_id,
+      version.id as version_id, version.version_number,
+      latest_processing.status as processing_status
+    from resurgo.documents document
+    inner join lateral (
+      select id, version_number
+      from resurgo.document_versions
+      where case_id = document.case_id and document_id = document.id
+      order by version_number desc
+      limit 1
+    ) version on true
+    inner join lateral (
+      select status
+      from resurgo.document_processing_events
+      where case_id = document.case_id
+        and document_id = document.id
+        and document_version_id = version.id
+      order by occurred_at desc, id desc
+      limit 1
+    ) latest_processing on true
+    where document.case_id = ${input.caseId}
+    order by document.created_at desc
+  `);
+  const authorized = [];
+  for (const row of result.rows) {
+    if (
+      await hasEffectiveResourceAccess(database, {
+        caseId: input.caseId,
+        operation: "view",
+        resourceId: row.resource_id,
+        userId: input.userId,
+      })
+    ) {
+      authorized.push(row);
+    }
+  }
+  return authorized;
+}
+
+export async function getAuthorizedAvailableDocumentVersion(
+  database: Database,
+  input: {
+    caseId: string;
+    documentId: string;
+    operation: "download" | "view";
+    userId: string;
+    versionId: string;
+  },
+) {
+  const [row] = await database
+    .select({
+      contentHash: documentVersions.contentHash,
+      documentId: documents.id,
+      format: documents.format,
+      mimeType: documentVersions.mimeType,
+      resourceId: documents.caseResourceId,
+      versionId: documentVersions.id,
+    })
+    .from(documentVersions)
+    .innerJoin(
+      documents,
+      and(
+        eq(documents.caseId, documentVersions.caseId),
+        eq(documents.id, documentVersions.documentId),
+      ),
+    )
+    .where(
+      and(
+        eq(documentVersions.caseId, input.caseId),
+        eq(documentVersions.documentId, input.documentId),
+        eq(documentVersions.id, input.versionId),
+      ),
+    )
+    .limit(1);
+  if (
+    !row ||
+    !(await hasEffectiveResourceAccess(database, {
+      caseId: input.caseId,
+      operation: input.operation,
+      resourceId: row.resourceId,
+      userId: input.userId,
+    }))
+  ) {
+    throw new AuthorizationDeniedError();
+  }
+  const latest = await database.execute<{ status: string }>(sql`
+    select status
+    from resurgo.document_processing_events
+    where case_id = ${input.caseId}
+      and document_id = ${input.documentId}
+      and document_version_id = ${input.versionId}
+    order by occurred_at desc, id desc
+    limit 1
+  `);
+  if (latest.rows[0]?.status !== "available") {
+    throw new AuthorizationDeniedError();
+  }
+  return row;
+}
+
+export async function recordDocumentAccessAudit(
+  database: Database,
+  input: {
+    action: "document.downloaded" | "document.previewed";
+    caseId: string;
+    userId: string;
+    versionId: string;
+  },
+) {
+  await database.insert(auditEvents).values(
+    buildAuditEvent({
+      action: input.action,
+      actorType: "user",
+      actorUserId: input.userId,
+      caseId: input.caseId,
+      outcome: "success",
+      resourceId: input.versionId,
+      resourceType: "document_version",
+    }),
+  );
 }
 
 export async function addDocumentVersion(

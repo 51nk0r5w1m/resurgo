@@ -43,7 +43,10 @@ export default async function DiscoveryPage({
         <Link className="brand" href="/dashboard">
           Resurgo
         </Link>
-        <span>{court}</span>
+        <nav aria-label="Case navigation">
+          <span>{court}</span>
+          <Link href={`/cases/${caseId}/documents`}>Documents</Link>
+        </nav>
       </header>
       <section className="journey-header">
         <p className="eyebrow">Atlanta pilot · Private case</p>

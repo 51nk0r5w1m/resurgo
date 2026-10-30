@@ -16,7 +16,9 @@ import { createCaseWithOwner } from "./domain/cases";
 import {
   addDocumentVersion,
   createDocumentWithVersion,
+  getAuthorizedAvailableDocumentVersion,
   grantDocumentAccess,
+  listAuthorizedDocuments,
 } from "./domain/documents";
 import {
   grantCaseMembership,
@@ -818,6 +820,72 @@ describe("case and professional security boundaries", () => {
 });
 
 describe("immutable document and professional review foundations", () => {
+  test("never exposes quarantined versions or cross-case document metadata", async () => {
+    const owner = await createSyntheticUser("document-boundary-owner");
+    const unrelated = await createSyntheticUser("document-boundary-unrelated");
+    const { case: clientCase } = await createCaseWithOwner(database, {
+      jurisdictionCode: "GA-FULTON-SUPERIOR",
+      ownerUserId: owner.id,
+    });
+    const created = await createDocumentWithVersion(database, {
+      byteSize: 512,
+      caseId: clientCase.id,
+      classification: "financial",
+      confidentiality: "financial_restricted",
+      contentHash: "6".repeat(64),
+      format: "pdf",
+      mimeType: "application/pdf",
+      retentionClass: "synthetic_pilot_record",
+      source: "client_upload",
+      title: "Synthetic property transition statement",
+      userId: owner.id,
+    });
+
+    await expect(
+      getAuthorizedAvailableDocumentVersion(database, {
+        caseId: clientCase.id,
+        documentId: created.document.id,
+        operation: "view",
+        userId: owner.id,
+        versionId: created.version.id,
+      }),
+    ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
+
+    await database.insert(schema.documentProcessingEvents).values({
+      caseId: clientCase.id,
+      documentId: created.document.id,
+      documentVersionId: created.version.id,
+      status: "available",
+    });
+    await expect(
+      getAuthorizedAvailableDocumentVersion(database, {
+        caseId: clientCase.id,
+        documentId: created.document.id,
+        operation: "view",
+        userId: owner.id,
+        versionId: created.version.id,
+      }),
+    ).resolves.toMatchObject({
+      documentId: created.document.id,
+      versionId: created.version.id,
+    });
+    await expect(
+      listAuthorizedDocuments(database, {
+        caseId: clientCase.id,
+        userId: unrelated.id,
+      }),
+    ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
+    await expect(
+      getAuthorizedAvailableDocumentVersion(database, {
+        caseId: clientCase.id,
+        documentId: created.document.id,
+        operation: "download",
+        userId: unrelated.id,
+        versionId: created.version.id,
+      }),
+    ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
+  });
+
   test("preserves exact evidence and immutable history after supersession and affiliation revocation", async () => {
     const owner = await createSyntheticUser("document-owner");
     const specialist = await createSyntheticUser("mortgage-specialist");

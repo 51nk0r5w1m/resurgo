@@ -13,9 +13,9 @@ const volumeTarget = compose.match(
   /^      - postgres-data:(\/var\/lib\/postgresql(?:\/[^\n]+)?)$/mu,
 )?.[1];
 
-if (!image || volumeTarget !== "/var/lib/postgresql/18/docker") {
+if (!image || volumeTarget !== "/var/lib/postgresql") {
   throw new Error(
-    "Compose must preserve the established PostgreSQL 18 PGDATA mount path",
+    "Compose must preserve the established PostgreSQL 18 volume root",
   );
 }
 
@@ -74,7 +74,19 @@ function startContainer() {
       "-c",
       "select 1",
     ]);
-    if (ready.status === 0) return;
+    if (ready.status === 0) {
+      requireSuccess(
+        docker([
+          "exec",
+          container,
+          "test",
+          "-f",
+          "/var/lib/postgresql/18/docker/PG_VERSION",
+        ]),
+        "PostgreSQL 18 PGDATA location check",
+      );
+      return;
+    }
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
   }
   throw new Error("PostgreSQL persistence test container did not become ready");

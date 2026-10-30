@@ -1,18 +1,17 @@
 # Local development environment
 
-**Status:** Implemented through Checkpoint B1 (RES-001/RES-002/RES-003).
+**Status:** Implemented through Checkpoint C2 (RES-019 through RES-022).
 
 ## Runtime topology
 
-| Component                  | Local exposure                             | Identity and data boundary                                                                    |
-| -------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| Next.js web                | loopback application port                  | application DB role; session secret; quarantine write/released read through storage adapter   |
-| PostgreSQL                 | loopback only                              | one local owner role currently; runtime/migration/audit role separation is a later gate       |
-| Mailpit                    | `127.0.0.1:1025`, UI at `127.0.0.1:8025`   | synthetic local verification/recovery mail only; never a production mail provider             |
-| S3-compatible object store | API on loopback; admin UI opt-in           | distinct web/worker credentials; private quarantine and released buckets; no anonymous policy |
-| ClamAV daemon              | deferred to document-processing checkpoint | will accept streams from the worker only; no host port                                        |
-| Document worker            | deferred to document-processing checkpoint | will have no inbound host port or auth/session secrets                                        |
-| Mail catcher               | deferred to identity checkpoint            | synthetic development messages only                                                           |
+| Component                  | Local exposure                           | Identity and data boundary                                                                    |
+| -------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Next.js web                | loopback application port                | application DB role; session secret; quarantine write/released read through storage adapter   |
+| PostgreSQL                 | loopback only                            | one local owner role currently; runtime/migration/audit role separation is a later gate       |
+| Mailpit                    | `127.0.0.1:1025`, UI at `127.0.0.1:8025` | synthetic local verification/recovery mail only; never a production mail provider             |
+| S3-compatible object store | API on loopback; admin UI opt-in         | distinct web/worker credentials; private quarantine and released buckets; no anonymous policy |
+| ClamAV daemon              | `127.0.0.1:3310` for local tests         | accepts bounded streams; worker reaches it over an internal network                           |
+| Document worker            | no inbound port                          | DB, object-storage, and scanner credentials only; no auth/session or SMTP secret              |
 
 Compose images must use immutable digests plus human-readable version comments.
 Named volumes are acceptable for local state; reset must be an explicit command
@@ -35,9 +34,9 @@ that names only project-owned volumes. Health checks gate migrations and tests.
 1. Garage 2.5.0 (AGPL-3.0) is the local S3-compatible service. The image is pinned
    by version and multi-architecture digest in Compose.
 2. PostgreSQL 18.6 is pinned by version, Alpine version, and image digest.
-   Its named volume is mounted at the image-configured PostgreSQL 18
-   declared volume root, `/var/lib/postgresql`; PostgreSQL 18 stores `PGDATA`
-   beneath it at `/var/lib/postgresql/18/docker`. The
+   Its named volume is mounted at the image-configured volume root,
+   `/var/lib/postgresql`; PostgreSQL 18 stores `PGDATA` beneath it at
+   `/var/lib/postgresql/18/docker`. The
    `pnpm test:postgres-persistence` regression test removes and recreates an
    isolated container and verifies the canary row survives in its named volume.
 3. `pnpm env:init` creates random, ignored local credentials with restrictive
@@ -45,14 +44,19 @@ that names only project-owned volumes. Health checks gate migrations and tests.
    exclusive hard-link publication; existing files are preserved and symlink
    destinations are rejected. Compose exposes only PostgreSQL and S3 APIs on
    loopback.
+4. ClamAV 1.5.4 and the Node 26 document worker use read-only root filesystems,
+   bounded CPU/memory/PID resources, internal networking, and dedicated writable
+   temporary/signature mounts. The worker exposes no network listener.
+5. PDF.js 6.4.299, pdf-lib 1.17.1, and bounded ZIP.js inspection validate source
+   structure. PDF previews are rasterized into a new PDF in the isolated worker.
 
 ## Remaining selection gates
 
-1. Select and license-review a PDF structural validator/preview transformation
-   tool in addition to ClamAV and PDF.js.
-2. Pin ClamAV and the mail catcher when their owning tickets begin.
-3. Decide whether local at-rest encryption is supplied by the object store,
+1. Decide whether local at-rest encryption is supplied by the object store,
    application envelope encryption, or both. Document how production keys differ.
+2. Split runtime, migration, worker, and audit-reader database/storage identities
+   before production deployment; the local stack currently shares development
+   credentials.
 
 ## Reproducibility acceptance
 

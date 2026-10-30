@@ -77,6 +77,10 @@ jobs:
         run: pnpm typecheck
       - name: Run unit tests
         run: pnpm test
+      - name: Start private document security services
+        run: |
+          pnpm env:init
+          docker compose --env-file .env -f infra/compose/compose.yaml up --detach --wait garage clamav
       - name: Validate migrations on an empty database
         run: pnpm db:validate
       - name: Apply migrations for integration tests
