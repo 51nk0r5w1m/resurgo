@@ -3,13 +3,16 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { SignOutButton } from "../../components/sign-out-button";
-import { getAuth } from "../../lib/auth";
+import { CaseCreationForm } from "../../components/case-creation-form";
+import { getAuth, getDatabase } from "../../lib/auth";
+import { listAccessibleCases } from "@resurgo/db";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const session = await getAuth().api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
+  const cases = await listAccessibleCases(getDatabase(), session.user.id);
 
   return (
     <main className="dashboard-shell">
@@ -37,11 +40,23 @@ export default async function DashboardPage() {
         <article className="dashboard-card">
           <p className="eyebrow">Your next step</p>
           <h2>Create an Atlanta-area case</h2>
-          <p>
-            Case creation will be enabled after the authorization security gate
-            passes.
-          </p>
+          <CaseCreationForm />
         </article>
+        {cases.map((caseRecord) => (
+          <article className="dashboard-card" key={caseRecord.id}>
+            <p className="eyebrow">Private case · {caseRecord.status}</p>
+            <h2>
+              {caseRecord.jurisdictionCode === "GA-FULTON-SUPERIOR"
+                ? "Fulton County"
+                : "DeKalb County"}
+            </h2>
+            <p>
+              <Link href={`/cases/${caseRecord.id}/discovery`}>
+                Continue guided discovery
+              </Link>
+            </p>
+          </article>
+        ))}
         <article className="dashboard-card">
           <p className="eyebrow">Professional identity</p>
           <h2>Verification is separate</h2>

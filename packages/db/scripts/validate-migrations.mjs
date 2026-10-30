@@ -45,10 +45,14 @@ try {
     ["resurgo", "case_resources"],
     ["resurgo", "cases"],
     ["resurgo", "disclosure_consents"],
+    ["resurgo", "discovery_answers"],
+    ["resurgo", "discovery_sessions"],
     ["resurgo", "jurisdictions"],
     ["resurgo", "organization_memberships"],
     ["resurgo", "organizations"],
+    ["resurgo", "recommendations"],
     ["resurgo", "resource_grants"],
+    ["resurgo", "roadmap_items"],
     ["resurgo", "system_metadata"],
   ];
   const relations = await pool.query(`

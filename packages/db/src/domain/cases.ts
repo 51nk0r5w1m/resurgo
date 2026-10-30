@@ -4,7 +4,12 @@ import { and, eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import * as schema from "../schema";
-import { auditEvents, caseMemberships, cases } from "../schema";
+import {
+  auditEvents,
+  caseMemberships,
+  cases,
+  discoverySessions,
+} from "../schema";
 import {
   decideCaseAuthorization,
   requireCaseAuthorization,
@@ -55,6 +60,14 @@ export async function createCaseWithOwner(
       throw new Error("Owner membership creation did not return a record");
     }
 
+    const [discoverySession] = await transaction
+      .insert(discoverySessions)
+      .values({ caseId: createdCase.id })
+      .returning();
+    if (!discoverySession) {
+      throw new Error("Discovery session creation did not return a record");
+    }
+
     const correlationId = input.correlationId ?? randomUUID();
     await transaction.insert(auditEvents).values({
       actorType: "user",
@@ -73,7 +86,7 @@ export async function createCaseWithOwner(
       }),
     });
 
-    return { case: createdCase, ownerMembership };
+    return { case: createdCase, discoverySession, ownerMembership };
   });
 }
 

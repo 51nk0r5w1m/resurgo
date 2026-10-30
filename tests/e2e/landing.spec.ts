@@ -11,14 +11,16 @@ test("shows the branded foundation without future feature controls", async ({
   await expect(
     page.getByRole("navigation", { name: "Primary navigation" }),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: "See how it works" })).toHaveCSS(
-    "color",
-    "rgb(251, 248, 239)",
-  );
+  await expect(
+    page.getByRole("link", { name: "Start privately" }).first(),
+  ).toHaveCSS("color", "rgb(251, 248, 239)");
   await expect(
     page.getByText("Privacy by design", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: /sign in/i })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /sign in/i })).toHaveAttribute(
+    "href",
+    "/login",
+  );
   await expect(
     page.getByRole("button", { name: /upload|generate|connect/i }),
   ).toHaveCount(0);

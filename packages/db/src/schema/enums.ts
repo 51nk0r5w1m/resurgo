@@ -91,3 +91,24 @@ export const auditOutcome = resurgoSchema.enum("audit_outcome", [
   "denied",
   "failure",
 ]);
+
+export const discoveryStatus = resurgoSchema.enum("discovery_status", [
+  "in_progress",
+  "completed",
+]);
+
+export const recommendationService = resurgoSchema.enum(
+  "recommendation_service",
+  [
+    "divorce_attorney",
+    "mortgage_specialist",
+    "financial_specialist",
+    "personal_support",
+  ],
+);
+
+export const roadmapStatus = resurgoSchema.enum("roadmap_status", [
+  "upcoming",
+  "ready",
+  "completed",
+]);

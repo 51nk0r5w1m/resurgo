@@ -1,0 +1,2564 @@
+{
+  "id": "39229664-c6cc-44a4-9f25-f8b2c2b93f66",
+  "prevId": "a29936fa-3870-4d7a-a5e9-d7eb283ab2e2",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "resurgo.system_metadata": {
+      "name": "system_metadata",
+      "schema": "resurgo",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "resurgo.audit_events": {
+      "name": "audit_events",
+      "schema": "resurgo",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "sequence": {
+          "name": "sequence",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "audit_events_sequence_seq",
+            "schema": "resurgo",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "actor_type": {
+          "name": "actor_type",
+          "type": "audit_actor_type",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actor_user_id": {
+          "name": "actor_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "resource_type": {
+          "name": "resource_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "resource_id": {
+          "name": "resource_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "case_id": {
+          "name": "case_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "outcome": {
+          "name": "outcome",
+          "type": "audit_outcome",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason_code": {
+          "name": "reason_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "correlation_id": {
+          "name": "correlation_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "causation_id": {
+          "name": "causation_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "previous_event_hash": {
+          "name": "previous_event_hash",
+          "type": "char(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "event_hash": {
+          "name": "event_hash",
+          "type": "char(64)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "audit_events_case_occurred_at_idx": {
+          "name": "audit_events_case_occurred_at_idx",
+          "columns": [
+            {
+              "expression": "case_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "audit_events_actor_occurred_at_idx": {
+          "name": "audit_events_actor_occurred_at_idx",
+          "columns": [
+            {
+              "expression": "actor_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "audit_events_correlation_id_idx": {
+          "name": "audit_events_correlation_id_idx",
+          "columns": [
+            {
+              "expression": "correlation_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "audit_events_actor_user_id_user_id_fk": {
+          "name": "audit_events_actor_user_id_user_id_fk",
+          "tableFrom": "audit_events",
+          "tableTo": "user",
+          "schemaTo": "auth",
+          "columnsFrom": ["actor_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "audit_events_case_id_cases_id_fk": {
+          "name": "audit_events_case_id_cases_id_fk",
+          "tableFrom": "audit_events",
+          "tableTo": "cases",
+          "schemaTo": "resurgo",
+          "columnsFrom": ["case_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "audit_events_sequence_unique": {
+          "name": "audit_events_sequence_unique",
+          "nullsNotDistinct": false,
+          "columns": ["sequence"]
+        },
+        "audit_events_event_hash_unique": {
+          "name": "audit_events_event_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": ["event_hash"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "audit_events_actor_check": {
+          "name": "audit_events_actor_check",
+          "value": "(\"resurgo\".\"audit_events\".\"actor_type\" = 'user' and \"resurgo\".\"audit_events\".\"actor_user_id\" is not null) or (\"resurgo\".\"audit_events\".\"actor_type\" = 'system' and \"resurgo\".\"audit_events\".\"actor_user_id\" is null)"
+        },
+        "audit_events_hash_check": {
+          "name": "audit_events_hash_check",
+          "value": "\"resurgo\".\"audit_events\".\"event_hash\" ~ '^[0-9a-f]{64}$' and (\"resurgo\".\"audit_events\".\"previous_event_hash\" is null or \"resurgo\".\"audit_events\".\"previous_event_hash\" ~ '^[0-9a-f]{64}$')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "auth.account": {
+      "name": "account",
+      "schema": "auth",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_id": {
+          "name": "provider_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "access_token": {
+          "name": "access_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refresh_token": {
+          "name": "refresh_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "access_token_expires_at": {
+          "name": "access_token_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refresh_token_expires_at": {
+          "name": "refresh_token_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "id_token": {
+          "name": "id_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password": {
+          "name": "password",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "auth_account_provider_account_unique": {
+          "name": "auth_account_provider_account_unique",
+          "columns": [
+            {
+              "expression": "provider_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "auth_account_user_id_idx": {
+          "name": "auth_account_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "account_user_id_user_id_fk": {
+          "name": "account_user_id_user_id_fk",
+          "tableFrom": "account",
+          "tableTo": "user",
+          "schemaTo": "auth",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "auth.rate_limit": {
+      "name": "rate_limit",
+      "schema": "auth",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "count": {
+          "name": "count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_request": {
+          "name": "last_request",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "rate_limit_key_unique": {
+          "name": "rate_limit_key_unique",
+          "nullsNotDistinct": false,
+          "columns": ["key"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "auth.session": {
+      "name": "session",
+      "schema": "auth",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ip_address": {
+          "name": "ip_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "auth_session_user_id_idx": {
+          "name": "auth_session_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "auth_session_expires_at_idx": {
+          "name": "auth_session_expires_at_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "session_user_id_user_id_fk": {
+          "name": "session_user_id_user_id_fk",
+          "tableFrom": "session",
+          "tableTo": "user",
+          "schemaTo": "auth",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "auth_session_token_unique": {
+          "name": "auth_session_token_unique",
+          "nullsNotDistinct": false,
+          "columns": ["token"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "auth.two_factor": {
+      "name": "two_factor",
+      "schema": "auth",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "secret": {
+          "name": "secret",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "backup_codes": {
+          "name": "backup_codes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "verified": {
+          "name": "verified",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "failed_verification_count": {
+          "name": "failed_verification_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "locked_until": {
+          "name": "locked_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "auth_two_factor_user_id_idx": {
+          "name": "auth_two_factor_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "auth_two_factor_secret_idx": {
+          "name": "auth_two_factor_secret_idx",
+          "columns": [
+            {
+              "expression": "secret",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "two_factor_user_id_user_id_fk": {
+          "name": "two_factor_user_id_user_id_fk",
+          "tableFrom": "two_factor",
+          "tableTo": "user",
+          "schemaTo": "auth",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "auth.user": {
+      "name": "user",
+      "schema": "auth",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email_verified": {
+          "name": "email_verified",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "image": {
+          "name": "image",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "two_factor_enabled": {
+          "name": "two_factor_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "auth_user_email_unique": {
+          "name": "auth_user_email_unique",
+          "nullsNotDistinct": false,
+          "columns": ["email"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "auth.verification": {
+      "name": "verification",
+      "schema": "auth",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "identifier": {
+          "name": "identifier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "auth_verification_identifier_idx": {
+          "name": "auth_verification_identifier_idx",
+          "columns": [
+            {
+              "expression": "identifier",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "auth_verification_expires_at_idx": {
+          "name": "auth_verification_expires_at_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "resurgo.case_memberships": {
+      "name": "case_memberships",
+      "schema": "resurgo",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "case_id": {
+          "name": "case_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "organization_membership_id": {
+          "name": "organization_membership_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "role": {
+          "name": "role",
+          "type": "case_role",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "membership_status",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'invited'"
+        },
+        "invited_by_user_id": {
+          "name": "invited_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "valid_from": {
+          "name": "valid_from",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "case_memberships_one_owner_idx": {
+          "name": "case_memberships_one_owner_idx",
+          "columns": [
+            {
+              "expression": "case_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"resurgo\".\"case_memberships\".\"role\" = 'owner'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "case_memberships_user_status_idx": {
+          "name": "case_memberships_user_status_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "case_memberships_case_status_idx": {
+          "name": "case_memberships_case_status_idx",
+          "columns": [
+            {
+              "expression": "case_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "case_memberships_case_id_cases_id_fk": {
+          "name": "case_memberships_case_id_cases_id_fk",
+          "tableFrom": "case_memberships",
+          "tableTo": "cases",
+          "schemaTo": "resurgo",
+          "columnsFrom": ["case_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "case_memberships_user_id_user_id_fk": {
+          "name": "case_memberships_user_id_user_id_fk",
+          "tableFrom": "case_memberships",
+          "tableTo": "user",
+          "schemaTo": "auth",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "case_memberships_invited_by_user_id_user_id_fk": {
+          "name": "case_memberships_invited_by_user_id_user_id_fk",
+          "tableFrom": "case_memberships",
+          "tableTo": "user",
+          "schemaTo": "auth",
+          "columnsFrom": ["invited_by_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "case_memberships_organization_membership_user_fk": {
+          "name": "case_memberships_organization_membership_user_fk",
+          "tableFrom": "case_memberships",
+          "tableTo": "organization_memberships",
+          "schemaTo": "resurgo",
+          "columnsFrom": ["organization_membership_id", "user_id"],
+          "columnsTo": ["id", "user_id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "case_memberships_case_user_unique": {
+          "name": "case_memberships_case_user_unique",
+          "nullsNotDistinct": false,
+          "columns": ["case_id", "user_id"]
+        },
+        "case_memberships_case_id_id_unique": {
+          "name": "case_memberships_case_id_id_unique",
+          "nullsNotDistinct": false,
+          "columns": ["case_id", "id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "case_memberships_professional_affiliation_check": {
+          "name": "case_memberships_professional_affiliation_check",
+          "value": "(\"resurgo\".\"case_memberships\".\"role\" in ('attorney', 'lender', 'accountant', 'mediator', 'support_professional') and \"resurgo\".\"case_memberships\".\"organization_membership_id\" is not null) or (\"resurgo\".\"case_memberships\".\"role\" not in ('attorney', 'lender', 'accountant', 'mediator', 'support_professional') and \"resurgo\".\"case_memberships\".\"organization_membership_id\" is null)"
+        },
+        "case_memberships_valid_interval_check": {
+          "name": "case_memberships_valid_interval_check",
+          "value": "\"resurgo\".\"case_memberships\".\"expires_at\" is null or \"resurgo\".\"case_memberships\".\"valid_from\" is null or \"resurgo\".\"case_memberships\".\"expires_at\" > \"resurgo\".\"case_memberships\".\"valid_from\""
+        },
+        "case_memberships_lifecycle_check": {
+          "name": "case_memberships_lifecycle_check",
+          "value": "(\"resurgo\".\"case_memberships\".\"status\" not in ('active', 'suspended') or \"resurgo\".\"case_memberships\".\"valid_from\" is not null) and (\"resurgo\".\"case_memberships\".\"status\" <> 'expired' or \"resurgo\".\"case_memberships\".\"expires_at\" is not null)"
+        },
+        "case_memberships_revoked_state_check": {
+          "name": "case_memberships_revoked_state_check",
+          "value": "(\"resurgo\".\"case_memberships\".\"status\" = 'revoked' and \"resurgo\".\"case_memberships\".\"revoked_at\" is not null) or (\"resurgo\".\"case_memberships\".\"status\" <> 'revoked' and \"resurgo\".\"case_memberships\".\"revoked_at\" is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "resurgo.cases": {
+      "name": "cases",
+      "schema": "resurgo",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "owner_user_id": {
+          "name": "owner_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "jurisdiction_code": {
+          "name": "jurisdiction_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "case_status",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "cases_owner_user_idx": {
+          "name": "cases_owner_user_idx",
+          "columns": [
+            {
+              "expression": "owner_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "cases_owner_user_id_user_id_fk": {
+          "name": "cases_owner_user_id_user_id_fk",
+          "tableFrom": "cases",
+          "tableTo": "user",
+          "schemaTo": "auth",
+          "columnsFrom": ["owner_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "cases_created_by_user_id_user_id_fk": {
+          "name": "cases_created_by_user_id_user_id_fk",
+          "tableFrom": "cases",
+          "tableTo": "user",
+          "schemaTo": "auth",
+          "columnsFrom": ["created_by_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "cases_jurisdiction_code_jurisdictions_code_fk": {
+          "name": "cases_jurisdiction_code_jurisdictions_code_fk",
+          "tableFrom": "cases",
+          "tableTo": "jurisdictions",
+          "schemaTo": "resurgo",
+          "columnsFrom": ["jurisdiction_code"],
+          "columnsTo": ["code"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "cases_id_owner_unique": {
+          "name": "cases_id_owner_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "owner_user_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "resurgo.jurisdictions": {
+      "name": "jurisdictions",
+      "schema": "resurgo",
+      "columns": {
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "state_code": {
+          "name": "state_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "county_name": {
+          "name": "county_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "court_name": {
+          "name": "court_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "judicial_circuit": {
+          "name": "judicial_circuit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_url": {
+          "name": "source_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "reviewed_at": {
+          "name": "reviewed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "jurisdictions_code_format_check": {
+          "name": "jurisdictions_code_format_check",
+          "value": "\"resurgo\".\"jurisdictions\".\"code\" ~ '^[A-Z]{2}-[A-Z]+-SUPERIOR$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "resurgo.organization_memberships": {
+      "name": "organization_memberships",
+      "schema": "resurgo",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "organization_role",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "membership_status",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'invited'"
+        },
+        "invited_by_user_id": {
+          "name": "invited_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "valid_from": {
+          "name": "valid_from",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "organization_memberships_user_idx": {
+          "name": "organization_memberships_user_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "organization_memberships_organization_status_idx": {
+          "name": "organization_memberships_organization_status_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "organization_memberships_organization_id_organizations_id_fk": {
+          "name": "organization_memberships_organization_id_organizations_id_fk",
+          "tableFrom": "organization_memberships",
+          "tableTo": "organizations",
+          "schemaTo": "resurgo",
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "organization_memberships_user_id_user_id_fk": {
+          "name": "organization_memberships_user_id_user_id_fk",
+          "tableFrom": "organization_memberships",
+          "tableTo": "user",
+          "schemaTo": "auth",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "organization_memberships_invited_by_user_id_user_id_fk": {
+          "name": "organization_memberships_invited_by_user_id_user_id_fk",
+          "tableFrom": "organization_memberships",
+          "tableTo": "user",
+          "schemaTo": "auth",
+          "columnsFrom": ["invited_by_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "organization_memberships_organization_user_unique": {
+          "name": "organization_memberships_organization_user_unique",
+          "nullsNotDistinct": false,
+          "columns": ["organization_id", "user_id"]
+        },
+        "organization_memberships_id_user_unique": {
+          "name": "organization_memberships_id_user_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "user_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "organization_memberships_valid_interval_check": {
+          "name": "organization_memberships_valid_interval_check",
+          "value": "\"resurgo\".\"organization_memberships\".\"expires_at\" is null or \"resurgo\".\"organization_memberships\".\"valid_from\" is null or \"resurgo\".\"organization_memberships\".\"expires_at\" > \"resurgo\".\"organization_memberships\".\"valid_from\""
+        },
+        "organization_memberships_lifecycle_check": {
+          "name": "organization_memberships_lifecycle_check",
+          "value": "(\"resurgo\".\"organization_memberships\".\"status\" not in ('active', 'suspended') or \"resurgo\".\"organization_memberships\".\"valid_from\" is not null) and (\"resurgo\".\"organization_memberships\".\"status\" <> 'expired' or \"resurgo\".\"organization_memberships\".\"expires_at\" is not null)"
+        },
+        "organization_memberships_revoked_state_check": {
+          "name": "organization_memberships_revoked_state_check",
+          "value": "(\"resurgo\".\"organization_memberships\".\"status\" = 'revoked' and \"resurgo\".\"organization_memberships\".\"revoked_at\" is not null) or (\"resurgo\".\"organization_memberships\".\"status\" <> 'revoked' and \"resurgo\".\"organization_memberships\".\"revoked_at\" is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "resurgo.organizations": {
+      "name": "organizations",
+      "schema": "resurgo",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "organization_type",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pilot_status": {
+          "name": "pilot_status",
+          "type": "pilot_verification_status",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'candidate'"
+        },
+        "verified_at": {
+          "name": "verified_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "verified_by_user_id": {
+          "name": "verified_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "organizations_verified_by_user_id_user_id_fk": {
+          "name": "organizations_verified_by_user_id_user_id_fk",
+          "tableFrom": "organizations",
+          "tableTo": "user",
+          "schemaTo": "auth",
+          "columnsFrom": ["verified_by_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "organizations_slug_unique": {
+          "name": "organizations_slug_unique",
+          "nullsNotDistinct": false,
+          "columns": ["slug"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "organizations_slug_format_check": {
+          "name": "organizations_slug_format_check",
+          "value": "\"resurgo\".\"organizations\".\"slug\" ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'"
+        },
+        "organizations_pilot_verification_check": {
+          "name": "organizations_pilot_verification_check",
+          "value": "(\"resurgo\".\"organizations\".\"pilot_status\" = 'candidate' and \"resurgo\".\"organizations\".\"verified_at\" is null and \"resurgo\".\"organizations\".\"verified_by_user_id\" is null) or (\"resurgo\".\"organizations\".\"pilot_status\" <> 'candidate' and \"resurgo\".\"organizations\".\"verified_at\" is not null and \"resurgo\".\"organizations\".\"verified_by_user_id\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "resurgo.discovery_answers": {
+      "name": "discovery_answers",
+      "schema": "resurgo",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "discovery_session_id": {
+          "name": "discovery_session_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "question_key": {
+          "name": "question_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "answer": {
+          "name": "answer",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "discovery_answers_session_revision_idx": {
+          "name": "discovery_answers_session_revision_idx",
+          "columns": [
+            {
+              "expression": "discovery_session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "revision",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "discovery_answers_discovery_session_id_discovery_sessions_id_fk": {
+          "name": "discovery_answers_discovery_session_id_discovery_sessions_id_fk",
+          "tableFrom": "discovery_answers",
+          "tableTo": "discovery_sessions",
+          "schemaTo": "resurgo",
+          "columnsFrom": ["discovery_session_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "discovery_answers_session_question_revision_unique": {
+          "name": "discovery_answers_session_question_revision_unique",
+          "nullsNotDistinct": false,
+          "columns": ["discovery_session_id", "question_key", "revision"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "discovery_answers_question_key_check": {
+          "name": "discovery_answers_question_key_check",
+          "value": "\"resurgo\".\"discovery_answers\".\"question_key\" in ('property_status', 'mortgage_status', 'financial_complexity', 'support_interest')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "resurgo.discovery_sessions": {
+      "name": "discovery_sessions",
+      "schema": "resurgo",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "case_id": {
+          "name": "case_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "discovery_status",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'in_progress'"
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "discovery_sessions_case_id_cases_id_fk": {
+          "name": "discovery_sessions_case_id_cases_id_fk",
+          "tableFrom": "discovery_sessions",
+          "tableTo": "cases",
+          "schemaTo": "resurgo",
+          "columnsFrom": ["case_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "discovery_sessions_case_unique": {
+          "name": "discovery_sessions_case_unique",
+          "nullsNotDistinct": false,
+          "columns": ["case_id"]
+        },
+        "discovery_sessions_id_case_unique": {
+          "name": "discovery_sessions_id_case_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "case_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "discovery_sessions_completion_check": {
+          "name": "discovery_sessions_completion_check",
+          "value": "(\"resurgo\".\"discovery_sessions\".\"status\" = 'completed' and \"resurgo\".\"discovery_sessions\".\"completed_at\" is not null) or (\"resurgo\".\"discovery_sessions\".\"status\" = 'in_progress' and \"resurgo\".\"discovery_sessions\".\"completed_at\" is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "resurgo.recommendations": {
+      "name": "recommendations",
+      "schema": "resurgo",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "case_id": {
+          "name": "case_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "discovery_session_id": {
+          "name": "discovery_session_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "generation": {
+          "name": "generation",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rule_version": {
+          "name": "rule_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "service": {
+          "name": "service",
+          "type": "recommendation_service",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "explanation": {
+          "name": "explanation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "recommendations_case_generation_idx": {
+          "name": "recommendations_case_generation_idx",
+          "columns": [
+            {
+              "expression": "case_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "generation",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "recommendations_case_id_cases_id_fk": {
+          "name": "recommendations_case_id_cases_id_fk",
+          "tableFrom": "recommendations",
+          "tableTo": "cases",
+          "schemaTo": "resurgo",
+          "columnsFrom": ["case_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "recommendations_discovery_session_id_discovery_sessions_id_fk": {
+          "name": "recommendations_discovery_session_id_discovery_sessions_id_fk",
+          "tableFrom": "recommendations",
+          "tableTo": "discovery_sessions",
+          "schemaTo": "resurgo",
+          "columnsFrom": ["discovery_session_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "recommendations_session_case_fk": {
+          "name": "recommendations_session_case_fk",
+          "tableFrom": "recommendations",
+          "tableTo": "discovery_sessions",
+          "schemaTo": "resurgo",
+          "columnsFrom": ["discovery_session_id", "case_id"],
+          "columnsTo": ["id", "case_id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "recommendations_session_generation_service_unique": {
+          "name": "recommendations_session_generation_service_unique",
+          "nullsNotDistinct": false,
+          "columns": ["discovery_session_id", "generation", "service"]
+        },
+        "recommendations_id_case_unique": {
+          "name": "recommendations_id_case_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "case_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "resurgo.roadmap_items": {
+      "name": "roadmap_items",
+      "schema": "resurgo",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "case_id": {
+          "name": "case_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recommendation_id": {
+          "name": "recommendation_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "generation": {
+          "name": "generation",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "roadmap_status",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'upcoming'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "roadmap_items_case_generation_idx": {
+          "name": "roadmap_items_case_generation_idx",
+          "columns": [
+            {
+              "expression": "case_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "generation",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "roadmap_items_case_id_cases_id_fk": {
+          "name": "roadmap_items_case_id_cases_id_fk",
+          "tableFrom": "roadmap_items",
+          "tableTo": "cases",
+          "schemaTo": "resurgo",
+          "columnsFrom": ["case_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "roadmap_items_recommendation_id_recommendations_id_fk": {
+          "name": "roadmap_items_recommendation_id_recommendations_id_fk",
+          "tableFrom": "roadmap_items",
+          "tableTo": "recommendations",
+          "schemaTo": "resurgo",
+          "columnsFrom": ["recommendation_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "roadmap_items_recommendation_case_fk": {
+          "name": "roadmap_items_recommendation_case_fk",
+          "tableFrom": "roadmap_items",
+          "tableTo": "recommendations",
+          "schemaTo": "resurgo",
+          "columnsFrom": ["recommendation_id", "case_id"],
+          "columnsTo": ["id", "case_id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "roadmap_items_case_generation_position_unique": {
+          "name": "roadmap_items_case_generation_position_unique",
+          "nullsNotDistinct": false,
+          "columns": ["case_id", "generation", "position"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "resurgo.case_resources": {
+      "name": "case_resources",
+      "schema": "resurgo",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "case_id": {
+          "name": "case_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owner_case_membership_id": {
+          "name": "owner_case_membership_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "resource_type",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "classification": {
+          "name": "classification",
+          "type": "resource_classification",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "case_resources_case_classification_idx": {
+          "name": "case_resources_case_classification_idx",
+          "columns": [
+            {
+              "expression": "case_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "classification",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "case_resources_case_id_cases_id_fk": {
+          "name": "case_resources_case_id_cases_id_fk",
+          "tableFrom": "case_resources",
+          "tableTo": "cases",
+          "schemaTo": "resurgo",
+          "columnsFrom": ["case_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "case_resources_owner_membership_fk": {
+          "name": "case_resources_owner_membership_fk",
+          "tableFrom": "case_resources",
+          "tableTo": "case_memberships",
+          "schemaTo": "resurgo",
+          "columnsFrom": ["case_id", "owner_case_membership_id"],
+          "columnsTo": ["case_id", "id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "case_resources_case_id_id_unique": {
+          "name": "case_resources_case_id_id_unique",
+          "nullsNotDistinct": false,
+          "columns": ["case_id", "id"]
+        },
+        "case_resources_case_id_id_classification_unique": {
+          "name": "case_resources_case_id_id_classification_unique",
+          "nullsNotDistinct": false,
+          "columns": ["case_id", "id", "classification"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "resurgo.disclosure_consents": {
+      "name": "disclosure_consents",
+      "schema": "resurgo",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "case_id": {
+          "name": "case_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "grantor_case_membership_id": {
+          "name": "grantor_case_membership_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recipient_case_membership_id": {
+          "name": "recipient_case_membership_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "classification": {
+          "name": "classification",
+          "type": "resource_classification",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "operation": {
+          "name": "operation",
+          "type": "resource_operation",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "terms_hash": {
+          "name": "terms_hash",
+          "type": "char(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "consent_status",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "effective_at": {
+          "name": "effective_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "disclosure_consents_case_recipient_status_idx": {
+          "name": "disclosure_consents_case_recipient_status_idx",
+          "columns": [
+            {
+              "expression": "case_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "recipient_case_membership_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "disclosure_consents_case_id_cases_id_fk": {
+          "name": "disclosure_consents_case_id_cases_id_fk",
+          "tableFrom": "disclosure_consents",
+          "tableTo": "cases",
+          "schemaTo": "resurgo",
+          "columnsFrom": ["case_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "disclosure_consents_grantor_membership_fk": {
+          "name": "disclosure_consents_grantor_membership_fk",
+          "tableFrom": "disclosure_consents",
+          "tableTo": "case_memberships",
+          "schemaTo": "resurgo",
+          "columnsFrom": ["case_id", "grantor_case_membership_id"],
+          "columnsTo": ["case_id", "id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "disclosure_consents_recipient_membership_fk": {
+          "name": "disclosure_consents_recipient_membership_fk",
+          "tableFrom": "disclosure_consents",
+          "tableTo": "case_memberships",
+          "schemaTo": "resurgo",
+          "columnsFrom": ["case_id", "recipient_case_membership_id"],
+          "columnsTo": ["case_id", "id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "disclosure_consents_grant_scope_unique": {
+          "name": "disclosure_consents_grant_scope_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "case_id",
+            "id",
+            "recipient_case_membership_id",
+            "classification",
+            "operation"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "disclosure_consents_distinct_parties_check": {
+          "name": "disclosure_consents_distinct_parties_check",
+          "value": "\"resurgo\".\"disclosure_consents\".\"grantor_case_membership_id\" <> \"resurgo\".\"disclosure_consents\".\"recipient_case_membership_id\""
+        },
+        "disclosure_consents_terms_hash_check": {
+          "name": "disclosure_consents_terms_hash_check",
+          "value": "\"resurgo\".\"disclosure_consents\".\"terms_hash\" ~ '^[0-9a-f]{64}$'"
+        },
+        "disclosure_consents_valid_interval_check": {
+          "name": "disclosure_consents_valid_interval_check",
+          "value": "\"resurgo\".\"disclosure_consents\".\"expires_at\" is null or \"resurgo\".\"disclosure_consents\".\"expires_at\" > \"resurgo\".\"disclosure_consents\".\"effective_at\""
+        },
+        "disclosure_consents_revoked_state_check": {
+          "name": "disclosure_consents_revoked_state_check",
+          "value": "(\"resurgo\".\"disclosure_consents\".\"status\" = 'revoked' and \"resurgo\".\"disclosure_consents\".\"revoked_at\" is not null) or (\"resurgo\".\"disclosure_consents\".\"status\" <> 'revoked' and \"resurgo\".\"disclosure_consents\".\"revoked_at\" is null)"
+        },
+        "disclosure_consents_expired_state_check": {
+          "name": "disclosure_consents_expired_state_check",
+          "value": "\"resurgo\".\"disclosure_consents\".\"status\" <> 'expired' or \"resurgo\".\"disclosure_consents\".\"expires_at\" is not null"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "resurgo.resource_grants": {
+      "name": "resource_grants",
+      "schema": "resurgo",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "case_id": {
+          "name": "case_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "resource_id": {
+          "name": "resource_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "grantee_case_membership_id": {
+          "name": "grantee_case_membership_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "classification": {
+          "name": "classification",
+          "type": "resource_classification",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "operation": {
+          "name": "operation",
+          "type": "resource_operation",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "basis": {
+          "name": "basis",
+          "type": "grant_basis",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_consent_id": {
+          "name": "source_consent_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "grant_status",
+          "typeSchema": "resurgo",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "effective_at": {
+          "name": "effective_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "resource_grants_active_scope_unique": {
+          "name": "resource_grants_active_scope_unique",
+          "columns": [
+            {
+              "expression": "resource_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "grantee_case_membership_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "operation",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "basis",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"resurgo\".\"resource_grants\".\"status\" = 'active'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "resource_grants_grantee_status_idx": {
+          "name": "resource_grants_grantee_status_idx",
+          "columns": [
+            {
+              "expression": "grantee_case_membership_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "resource_grants_grantee_membership_fk": {
+          "name": "resource_grants_grantee_membership_fk",
+          "tableFrom": "resource_grants",
+          "tableTo": "case_memberships",
+          "schemaTo": "resurgo",
+          "columnsFrom": ["case_id", "grantee_case_membership_id"],
+          "columnsTo": ["case_id", "id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "resource_grants_resource_classification_fk": {
+          "name": "resource_grants_resource_classification_fk",
+          "tableFrom": "resource_grants",
+          "tableTo": "case_resources",
+          "schemaTo": "resurgo",
+          "columnsFrom": ["case_id", "resource_id", "classification"],
+          "columnsTo": ["case_id", "id", "classification"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "resource_grants_source_consent_scope_fk": {
+          "name": "resource_grants_source_consent_scope_fk",
+          "tableFrom": "resource_grants",
+          "tableTo": "disclosure_consents",
+          "schemaTo": "resurgo",
+          "columnsFrom": [
+            "case_id",
+            "source_consent_id",
+            "grantee_case_membership_id",
+            "classification",
+            "operation"
+          ],
+          "columnsTo": [
+            "case_id",
+            "id",
+            "recipient_case_membership_id",
+            "classification",
+            "operation"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "resource_grants_basis_consent_check": {
+          "name": "resource_grants_basis_consent_check",
+          "value": "(\"resurgo\".\"resource_grants\".\"basis\" = 'explicit_consent' and \"resurgo\".\"resource_grants\".\"source_consent_id\" is not null) or (\"resurgo\".\"resource_grants\".\"basis\" = 'case_owner' and \"resurgo\".\"resource_grants\".\"source_consent_id\" is null)"
+        },
+        "resource_grants_valid_interval_check": {
+          "name": "resource_grants_valid_interval_check",
+          "value": "\"resurgo\".\"resource_grants\".\"expires_at\" is null or \"resurgo\".\"resource_grants\".\"expires_at\" > \"resurgo\".\"resource_grants\".\"effective_at\""
+        },
+        "resource_grants_revoked_state_check": {
+          "name": "resource_grants_revoked_state_check",
+          "value": "(\"resurgo\".\"resource_grants\".\"status\" = 'revoked' and \"resurgo\".\"resource_grants\".\"revoked_at\" is not null) or (\"resurgo\".\"resource_grants\".\"status\" <> 'revoked' and \"resurgo\".\"resource_grants\".\"revoked_at\" is null)"
+        },
+        "resource_grants_expired_state_check": {
+          "name": "resource_grants_expired_state_check",
+          "value": "\"resurgo\".\"resource_grants\".\"status\" <> 'expired' or \"resurgo\".\"resource_grants\".\"expires_at\" is not null"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "resurgo.audit_actor_type": {
+      "name": "audit_actor_type",
+      "schema": "resurgo",
+      "values": ["user", "system"]
+    },
+    "resurgo.audit_outcome": {
+      "name": "audit_outcome",
+      "schema": "resurgo",
+      "values": ["success", "denied", "failure"]
+    },
+    "resurgo.case_role": {
+      "name": "case_role",
+      "schema": "resurgo",
+      "values": [
+        "owner",
+        "co_client",
+        "attorney",
+        "lender",
+        "accountant",
+        "mediator",
+        "support_professional",
+        "coordinator"
+      ]
+    },
+    "resurgo.case_status": {
+      "name": "case_status",
+      "schema": "resurgo",
+      "values": ["active", "paused", "closed"]
+    },
+    "resurgo.consent_status": {
+      "name": "consent_status",
+      "schema": "resurgo",
+      "values": ["active", "revoked", "expired"]
+    },
+    "resurgo.discovery_status": {
+      "name": "discovery_status",
+      "schema": "resurgo",
+      "values": ["in_progress", "completed"]
+    },
+    "resurgo.grant_basis": {
+      "name": "grant_basis",
+      "schema": "resurgo",
+      "values": ["case_owner", "explicit_consent"]
+    },
+    "resurgo.grant_status": {
+      "name": "grant_status",
+      "schema": "resurgo",
+      "values": ["active", "revoked", "expired"]
+    },
+    "resurgo.membership_status": {
+      "name": "membership_status",
+      "schema": "resurgo",
+      "values": ["invited", "active", "suspended", "revoked", "expired"]
+    },
+    "resurgo.organization_role": {
+      "name": "organization_role",
+      "schema": "resurgo",
+      "values": ["owner", "admin", "professional", "staff"]
+    },
+    "resurgo.organization_type": {
+      "name": "organization_type",
+      "schema": "resurgo",
+      "values": [
+        "law_firm",
+        "lender",
+        "accounting_firm",
+        "mediation_practice",
+        "support_provider",
+        "other_professional"
+      ]
+    },
+    "resurgo.pilot_verification_status": {
+      "name": "pilot_verification_status",
+      "schema": "resurgo",
+      "values": ["candidate", "verified", "suspended", "ended"]
+    },
+    "resurgo.recommendation_service": {
+      "name": "recommendation_service",
+      "schema": "resurgo",
+      "values": [
+        "divorce_attorney",
+        "mortgage_specialist",
+        "financial_specialist",
+        "personal_support"
+      ]
+    },
+    "resurgo.resource_classification": {
+      "name": "resource_classification",
+      "schema": "resurgo",
+      "values": ["shared", "legal", "financial", "personal_support", "health"]
+    },
+    "resurgo.resource_operation": {
+      "name": "resource_operation",
+      "schema": "resurgo",
+      "values": ["view", "download", "share"]
+    },
+    "resurgo.resource_type": {
+      "name": "resource_type",
+      "schema": "resurgo",
+      "values": [
+        "document",
+        "intake_response",
+        "roadmap_item",
+        "coordination_note"
+      ]
+    },
+    "resurgo.roadmap_status": {
+      "name": "roadmap_status",
+      "schema": "resurgo",
+      "values": ["upcoming", "ready", "completed"]
+    }
+  },
+  "schemas": {
+    "resurgo": "resurgo",
+    "auth": "auth"
+  },
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

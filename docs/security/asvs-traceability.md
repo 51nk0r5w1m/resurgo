@@ -118,3 +118,16 @@ are the named evidence for the applicable requirements:
 | `v5.0.0-8.3.2`                 | Current-state queries and concurrent-revocation test prove the next decision denies revoked membership; professional organization and affiliation changes are revalidated | Additional risk-based L3 evidence; distributed-cache behavior is not applicable because authorization caching is disabled |
 | `v5.0.0-8.4.1`                 | Cross-case foreign-key tests, cross-organization tests, organization-peer grant denial, and request-level case isolation                                                  | Implemented automated evidence for current relations                                                                      |
 | `v5.0.0-16.3.1`                | Case creation/grant/revoke success and request-level denials append minimized audit events                                                                                | Event content is schema-constrained; explicit event-presence test remains                                                 |
+
+## First client journey evidence
+
+No ASVS control is marked fully verified solely by this checkpoint. The client
+journey adds the following named implementation and automated evidence:
+
+| Requirement                                       | Evidence                                                                                                                                                | Status / limitation                                                                  |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `v5.0.0-2.2.1`                                    | Server schemas restrict case creation to the two enabled pilot jurisdictions and discovery answers to known question/option pairs                       | Implemented evidence for the current journey inputs                                  |
+| `v5.0.0-8.2.2`, `v5.0.0-8.3.1`, `v5.0.0-8.4.1`    | Central case policy guards every discovery operation; integration tests deny an unrelated principal and composite foreign keys reject cross-case output | Implemented automated evidence for discovery, recommendations, and roadmap relations |
+| `v5.0.0-14.2.1`                                   | Answer values are sent in request bodies and are absent from route URLs, audit metadata, and browser navigation                                         | Integration test asserts raw answer values are absent from audit events              |
+| `v5.0.0-14.3.2`                                   | Discovery API responses emit `Cache-Control: no-store`                                                                                                  | Header is configured; direct browser assertion remains                               |
+| `v5.0.0-16.2.1`, `v5.0.0-16.2.5`, `v5.0.0-16.3.1` | Answer-save and completion events record actor, case/session, action, outcome, correlation ID, and integrity value without answer content               | Integration test asserts event presence and raw-answer redaction                     |
