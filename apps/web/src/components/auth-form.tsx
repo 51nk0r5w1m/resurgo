@@ -87,6 +87,10 @@ export function AuthForm({
           );
         }
       }
+    } catch {
+      setMessage(
+        "We could not complete your request. Check your connection and try again.",
+      );
     } finally {
       setPending(false);
     }
