@@ -19,7 +19,7 @@ transitions. Fulton County Superior Court and DeKalb County Superior Court are t
 only enabled court jurisdictions. Atlanta is not treated as a single court
 jurisdiction.
 
-Centurion is a prospective commercial design partner subject to a formal pilot
+Prospective commercial design partners are subject to a formal pilot
 agreement. It must not be represented in fixtures or configuration as a verified
 provider before that agreement and onboarding review are complete. All test data
 is synthetic.
