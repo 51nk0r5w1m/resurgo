@@ -34,7 +34,9 @@ export default async function DiscoveryPage({
   const court =
     caseRecord.jurisdictionCode === "GA-FULTON-SUPERIOR"
       ? "Fulton County Superior Court"
-      : "DeKalb County Superior Court";
+      : caseRecord.jurisdictionCode === "GA-DEKALB-SUPERIOR"
+        ? "DeKalb County Superior Court"
+        : "Court information unavailable";
   return (
     <main className="dashboard-shell">
       <header className="dashboard-header">
