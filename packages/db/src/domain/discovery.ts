@@ -303,13 +303,19 @@ export async function completeDiscovery(
       throw new Error("Discovery session is not in progress");
     }
     const answers = await latestAnswers(transaction, session.id);
-    const missing = visibleDiscoveryQuestions(answers)
-      .map(({ key }) => key)
-      .filter((key) => answers[key] === undefined);
+    const visibleQuestions = visibleDiscoveryQuestions(answers);
+      const visibleAnswers = Object.fromEntries(
+        visibleQuestions
+          .filter(({ key }) => answers[key] !== undefined)
+          .map(({ key }) => [key, answers[key]]),
+      );
+      const missing = visibleQuestions
+        .map(({ key }) => key)
+        .filter((key) => answers[key] === undefined);
     if (missing.length > 0) throw new Error("Discovery is incomplete");
 
     const generation = session.revision;
-    const generated = deterministicRecommendations(answers);
+    const generated = deterministicRecommendations(visibleAnswers);
     const createdRecommendations = await transaction
       .insert(recommendations)
       .values(
