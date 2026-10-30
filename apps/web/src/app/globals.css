@@ -36,6 +36,150 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
+.auth-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.85fr) minmax(420px, 1.15fr);
+  min-height: 100vh;
+}
+
+.auth-brand-panel {
+  background: var(--color-forest);
+  color: var(--color-ivory);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: clamp(2rem, 6vw, 5rem);
+}
+
+.auth-brand-panel .brand,
+.auth-brand-panel h1 {
+  color: var(--color-ivory);
+}
+.auth-brand-panel h1 {
+  font-size: clamp(3rem, 6vw, 6rem);
+}
+.auth-brand-panel p {
+  line-height: 1.65;
+  max-width: 34rem;
+}
+
+.auth-form-panel {
+  align-items: center;
+  display: flex;
+  padding: 3rem 6vw;
+}
+.auth-card {
+  margin: auto;
+  max-width: 34rem;
+  width: 100%;
+}
+.auth-card h2 {
+  font-size: clamp(2.4rem, 5vw, 4rem);
+}
+.auth-form {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 2.5rem;
+}
+.auth-form label {
+  display: grid;
+  font-size: 0.9rem;
+  font-weight: 700;
+  gap: 0.5rem;
+}
+.auth-form input {
+  background: white;
+  border: 1px solid var(--color-line);
+  border-radius: 0.3rem;
+  color: var(--color-ink);
+  font: inherit;
+  min-height: 3.25rem;
+  padding: 0.75rem 0.9rem;
+}
+.auth-form input:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-sage) 45%, transparent);
+  outline-offset: 2px;
+}
+.auth-form small {
+  font-weight: 400;
+}
+.form-message {
+  min-height: 1.5rem;
+  line-height: 1.5;
+}
+.auth-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+}
+.auth-links a {
+  color: var(--color-forest);
+  text-decoration: underline;
+}
+.check-row {
+  align-items: center;
+  display: flex !important;
+  font-weight: 400 !important;
+}
+.check-row input {
+  min-height: auto;
+}
+
+.dashboard-shell {
+  min-height: 100vh;
+}
+.dashboard-header {
+  align-items: center;
+  border-bottom: 1px solid var(--color-line);
+  display: flex;
+  justify-content: space-between;
+  padding: 1.25rem 5vw;
+}
+.dashboard-hero {
+  background: var(--color-sage-pale);
+  padding: 6rem 5vw;
+}
+.dashboard-hero h1 {
+  font-size: clamp(3rem, 7vw, 6.5rem);
+  margin-bottom: 1.5rem;
+}
+.dashboard-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(2, 1fr);
+  padding: 4rem 5vw;
+}
+.dashboard-card {
+  border: 1px solid var(--color-line);
+  padding: 2.5rem;
+}
+.dashboard-card h2 {
+  font-size: 2rem;
+}
+.setup-key {
+  overflow-wrap: anywhere;
+}
+.recovery-codes {
+  columns: 2;
+  line-height: 1.9;
+  padding-left: 1.5rem;
+}
+
+@media (max-width: 760px) {
+  .auth-layout {
+    grid-template-columns: 1fr;
+  }
+  .auth-brand-panel {
+    min-height: 38vh;
+  }
+  .auth-form-panel {
+    padding: 3rem 1.25rem;
+  }
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .site-header {
   align-items: center;
   background: color-mix(in srgb, var(--color-ivory) 94%, transparent);

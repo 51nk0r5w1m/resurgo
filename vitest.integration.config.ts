@@ -4,7 +4,10 @@ export default defineConfig({
   test: {
     environment: "node",
     fileParallelism: false,
-    include: ["packages/**/*.integration.test.ts"],
+    include: [
+      "apps/**/*.integration.test.ts",
+      "packages/**/*.integration.test.ts",
+    ],
     testTimeout: 15_000,
   },
 });

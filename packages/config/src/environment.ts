@@ -9,6 +9,7 @@ const nonPlaceholderSecret = z
   );
 
 export const environmentSchema = z.object({
+  BETTER_AUTH_SECRET: nonPlaceholderSecret.min(32),
   DATABASE_URL: z.url().startsWith("postgresql://"),
   GARAGE_ACCESS_KEY_ID: z.string().startsWith("GK").min(18),
   GARAGE_BUCKET: z.string().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/),
@@ -22,6 +23,9 @@ export const environmentSchema = z.object({
   POSTGRES_DB: z.string().regex(/^[a-z_][a-z0-9_]*$/),
   POSTGRES_PASSWORD: nonPlaceholderSecret,
   POSTGRES_USER: z.string().regex(/^[a-z_][a-z0-9_]*$/),
+  SMTP_HOST: z.string().min(1),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535),
+  SMTP_FROM: z.email(),
 });
 
 export type Environment = z.infer<typeof environmentSchema>;

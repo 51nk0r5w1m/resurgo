@@ -16,8 +16,14 @@ await ensurePrivateDirectory(secretsDirectory);
 const postgresPassword = randomHex(24);
 const garageAccessKey = `GK${randomHex(16).toUpperCase()}`;
 const garageSecretKey = randomHex(32);
+const betterAuthSecret = randomHex(32);
 const envContents = `NODE_ENV=development
 NEXT_PUBLIC_APP_URL=http://127.0.0.1:3000
+BETTER_AUTH_SECRET=${betterAuthSecret}
+
+SMTP_HOST=127.0.0.1
+SMTP_PORT=1025
+SMTP_FROM=no-reply@resurgo.local
 
 POSTGRES_USER=resurgo
 POSTGRES_PASSWORD=${postgresPassword}

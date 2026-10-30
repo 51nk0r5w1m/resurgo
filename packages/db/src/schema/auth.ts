@@ -1,5 +1,7 @@
 import {
   boolean,
+  bigint,
+  integer,
   index,
   pgSchema,
   text,
@@ -25,9 +27,41 @@ export const user = authSchema.table(
     updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
+    twoFactorEnabled: boolean("two_factor_enabled").default(false).notNull(),
   },
   (table) => [unique("auth_user_email_unique").on(table.email)],
 );
+
+export const twoFactor = authSchema.table(
+  "two_factor",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    secret: text("secret").notNull(),
+    backupCodes: text("backup_codes").notNull(),
+    verified: boolean("verified").default(true).notNull(),
+    failedVerificationCount: integer("failed_verification_count")
+      .default(0)
+      .notNull(),
+    lockedUntil: timestamp("locked_until", {
+      mode: "date",
+      withTimezone: true,
+    }),
+  },
+  (table) => [
+    index("auth_two_factor_user_id_idx").on(table.userId),
+    index("auth_two_factor_secret_idx").on(table.secret),
+  ],
+);
+
+export const rateLimit = authSchema.table("rate_limit", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  key: text("key").notNull().unique(),
+  count: integer("count").notNull(),
+  lastRequest: bigint("last_request", { mode: "number" }).notNull(),
+});
 
 export const session = authSchema.table(
   "session",

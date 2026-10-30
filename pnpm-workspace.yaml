@@ -11,7 +11,15 @@ overrides:
 
 minimumReleaseAgeExclude:
   - lucide-react@1.64.0
+  - nodemailer@10.3.1
 
 allowBuilds:
   esbuild: true
   unrs-resolver: true
+
+catalog:
+  "@better-auth/drizzle-adapter": 1.7.14
+  "@resurgo/db": workspace:*
+  "@types/nodemailer": 7.0.11
+  better-auth: 1.7.14
+  nodemailer: 10.3.1
