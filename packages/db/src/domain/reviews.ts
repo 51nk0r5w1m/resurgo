@@ -15,6 +15,7 @@ import {
   professionalReviews,
   professionalReviewStatements,
   resourceGrants,
+  user,
 } from "../schema";
 import {
   AuthorizationDeniedError,
@@ -433,7 +434,273 @@ export async function appendProfessionalReviewRevision(
       reviewRevisionId: revision.id,
       statements: input.statements ?? [],
     });
+    await transaction.insert(auditEvents).values(
+      buildAuditEvent({
+        action: "professional_review.revision.created",
+        actorType: "user",
+        actorUserId: input.userId,
+        caseId: input.caseId,
+        outcome: "success",
+        resourceId: revision.id,
+        resourceType: "professional_review_revision",
+      }),
+    );
     return revision;
+  });
+}
+
+export async function invalidateReviewsForEvidenceChange(
+  database: Database,
+  input: {
+    actorCaseMembershipId: string;
+    actorUserId: string;
+    caseId: string;
+    supersededDocumentVersionId: string;
+  },
+) {
+  const result = await database.execute<{
+    decision_context: string;
+    professional_review_id: string;
+    review_scope: string;
+    revision: number;
+    revision_id: string;
+  }>(sql`
+    select review.id as professional_review_id,
+      revision.id as revision_id, revision.revision,
+      revision.decision_context, revision.review_scope
+    from resurgo.professional_reviews review
+    inner join resurgo.professional_review_revisions revision
+      on revision.case_id = review.case_id
+      and revision.professional_review_id = review.id
+    inner join resurgo.professional_review_evidence evidence
+      on evidence.case_id = revision.case_id
+      and evidence.professional_review_id = revision.professional_review_id
+      and evidence.review_revision_id = revision.id
+    where review.case_id = ${input.caseId}
+      and evidence.document_version_id = ${input.supersededDocumentVersionId}
+      and revision.status in ('assigned', 'in_progress', 'clarification_required', 'completed')
+      and not exists (
+        select 1 from resurgo.professional_review_revisions newer
+        where newer.case_id = revision.case_id
+          and newer.professional_review_id = revision.professional_review_id
+          and newer.revision > revision.revision
+      )
+    for update of revision
+  `);
+  for (const current of result.rows) {
+    const [invalidated] = await database
+      .insert(professionalReviewRevisions)
+      .values({
+        caseId: input.caseId,
+        createdByCaseMembershipId: input.actorCaseMembershipId,
+        decisionContext: current.decision_context,
+        professionalReviewId: current.professional_review_id,
+        reviewScope: current.review_scope,
+        revision: current.revision + 1,
+        status: "superseded",
+        supersedesRevisionId: current.revision_id,
+      })
+      .returning({ id: professionalReviewRevisions.id });
+    if (!invalidated) throw new Error("Review invalidation failed");
+    await database.insert(auditEvents).values(
+      buildAuditEvent({
+        action: "professional_review.evidence_superseded",
+        actorType: "user",
+        actorUserId: input.actorUserId,
+        caseId: input.caseId,
+        outcome: "success",
+        reasonCode: "document_version_superseded",
+        resourceId: current.professional_review_id,
+        resourceType: "professional_review",
+      }),
+    );
+  }
+  return result.rows.length;
+}
+
+export async function listAuthorizedProfessionalReviews(
+  database: Database,
+  input: { caseId: string; userId: string },
+) {
+  await requireCaseAuthorization(database, { ...input, operation: "read" });
+  const rows = await database
+    .select({
+      caseResourceId: professionalReviews.caseResourceId,
+      createdAt: professionalReviews.createdAt,
+      decisionContext: professionalReviewRevisions.decisionContext,
+      professionalName: user.name,
+      professionalReviewId: professionalReviews.id,
+      responsibleCaseMembershipId:
+        professionalReviews.responsibleCaseMembershipId,
+      reviewRevisionId: professionalReviewRevisions.id,
+      reviewScope: professionalReviewRevisions.reviewScope,
+      revision: professionalReviewRevisions.revision,
+      status: professionalReviewRevisions.status,
+      subjectType: professionalReviews.subjectType,
+    })
+    .from(professionalReviews)
+    .innerJoin(
+      professionalReviewRevisions,
+      and(
+        eq(
+          professionalReviewRevisions.professionalReviewId,
+          professionalReviews.id,
+        ),
+        sql`${professionalReviewRevisions.revision} = (
+          select max(latest.revision)
+          from resurgo.professional_review_revisions latest
+          where latest.case_id = ${professionalReviews.caseId}
+            and latest.professional_review_id = ${professionalReviews.id}
+        )`,
+      ),
+    )
+    .innerJoin(
+      caseMemberships,
+      and(
+        eq(caseMemberships.caseId, professionalReviews.caseId),
+        eq(caseMemberships.id, professionalReviews.responsibleCaseMembershipId),
+      ),
+    )
+    .innerJoin(user, eq(user.id, caseMemberships.userId))
+    .where(eq(professionalReviews.caseId, input.caseId));
+  const authorized = [];
+  for (const row of rows) {
+    if (
+      !(await hasEffectiveResourceAccess(database, {
+        caseId: input.caseId,
+        operation: "view",
+        resourceId: row.caseResourceId,
+        userId: input.userId,
+      }))
+    ) {
+      continue;
+    }
+    const [evidence, statements] = await Promise.all([
+      database
+        .select({
+          documentId: professionalReviewEvidence.documentId,
+          documentVersionId: professionalReviewEvidence.documentVersionId,
+          purpose: professionalReviewEvidence.purpose,
+          title: documents.title,
+          versionNumber: documentVersions.versionNumber,
+        })
+        .from(professionalReviewEvidence)
+        .innerJoin(
+          documentVersions,
+          and(
+            eq(
+              documentVersions.id,
+              professionalReviewEvidence.documentVersionId,
+            ),
+            eq(
+              documentVersions.documentId,
+              professionalReviewEvidence.documentId,
+            ),
+          ),
+        )
+        .innerJoin(documents, eq(documents.id, documentVersions.documentId))
+        .where(
+          eq(professionalReviewEvidence.reviewRevisionId, row.reviewRevisionId),
+        ),
+      database
+        .select({
+          body: professionalReviewStatements.body,
+          conditionStatus: professionalReviewStatements.conditionStatus,
+          type: professionalReviewStatements.type,
+        })
+        .from(professionalReviewStatements)
+        .where(
+          eq(
+            professionalReviewStatements.reviewRevisionId,
+            row.reviewRevisionId,
+          ),
+        ),
+    ]);
+    authorized.push({ ...row, evidence, statements });
+  }
+  return authorized;
+}
+
+export async function grantProfessionalReviewAccess(
+  database: Database,
+  input: {
+    caseId: string;
+    consentId: string;
+    granteeCaseMembershipId: string;
+    operation: "contribute" | "view";
+    professionalReviewId: string;
+    userId: string;
+  },
+) {
+  return database.transaction(async (transaction) => {
+    await requireCaseAuthorization(transaction, {
+      caseId: input.caseId,
+      operation: "manage",
+      userId: input.userId,
+    });
+    const [review] = await transaction
+      .select({
+        classification: caseResources.classification,
+        resourceId: professionalReviews.caseResourceId,
+      })
+      .from(professionalReviews)
+      .innerJoin(
+        caseResources,
+        eq(caseResources.id, professionalReviews.caseResourceId),
+      )
+      .where(
+        and(
+          eq(professionalReviews.caseId, input.caseId),
+          eq(professionalReviews.id, input.professionalReviewId),
+        ),
+      )
+      .limit(1);
+    if (!review) throw new AuthorizationDeniedError();
+    const [consent] = await transaction
+      .select({ id: disclosureConsents.id })
+      .from(disclosureConsents)
+      .where(
+        and(
+          eq(disclosureConsents.caseId, input.caseId),
+          eq(disclosureConsents.id, input.consentId),
+          eq(
+            disclosureConsents.recipientCaseMembershipId,
+            input.granteeCaseMembershipId,
+          ),
+          eq(disclosureConsents.classification, review.classification),
+          eq(disclosureConsents.operation, input.operation),
+          eq(disclosureConsents.status, "active"),
+          sql`${disclosureConsents.effectiveAt} <= now()`,
+          sql`(${disclosureConsents.expiresAt} is null or ${disclosureConsents.expiresAt} > now())`,
+          sql`${disclosureConsents.revokedAt} is null`,
+        ),
+      )
+      .limit(1);
+    if (!consent) throw new AuthorizationDeniedError();
+    const [grant] = await transaction
+      .insert(resourceGrants)
+      .values({
+        basis: "explicit_consent",
+        caseId: input.caseId,
+        classification: review.classification,
+        granteeCaseMembershipId: input.granteeCaseMembershipId,
+        operation: input.operation,
+        resourceId: review.resourceId,
+        sourceConsentId: consent.id,
+      })
+      .returning();
+    await transaction.insert(auditEvents).values(
+      buildAuditEvent({
+        action: "professional_review.access_granted",
+        actorType: "user",
+        actorUserId: input.userId,
+        caseId: input.caseId,
+        outcome: "success",
+        resourceId: input.professionalReviewId,
+        resourceType: "professional_review",
+      }),
+    );
+    return grant;
   });
 }
 
@@ -480,7 +747,10 @@ export async function recordAttorneyReviewAcknowledgement(
     });
     if (actor.role !== "attorney") throw new AuthorizationDeniedError();
     const [revision] = await transaction
-      .select({ id: professionalReviewRevisions.id })
+      .select({
+        id: professionalReviewRevisions.id,
+        status: professionalReviewRevisions.status,
+      })
       .from(professionalReviewRevisions)
       .where(
         and(
@@ -493,7 +763,9 @@ export async function recordAttorneyReviewAcknowledgement(
         ),
       )
       .limit(1);
-    if (!revision) throw new AuthorizationDeniedError();
+    if (!revision || revision.status !== "completed") {
+      throw new AuthorizationDeniedError();
+    }
     const [event] = await transaction
       .insert(professionalReviewAcknowledgements)
       .values({
@@ -505,6 +777,17 @@ export async function recordAttorneyReviewAcknowledgement(
         statementHash: input.statementHash,
       })
       .returning();
+    await transaction.insert(auditEvents).values(
+      buildAuditEvent({
+        action: `professional_review.attorney_${input.action}`,
+        actorType: "user",
+        actorUserId: input.userId,
+        caseId: input.caseId,
+        outcome: "success",
+        resourceId: input.reviewRevisionId,
+        resourceType: "professional_review_revision",
+      }),
+    );
     return event;
   });
 }

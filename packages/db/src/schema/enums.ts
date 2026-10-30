@@ -48,6 +48,7 @@ export const caseRole = resurgoSchema.enum("case_role", [
 
 export const resourceType = resurgoSchema.enum("resource_type", [
   "document",
+  "document_request",
   "professional_review",
   "intake_response",
   "roadmap_item",
@@ -157,6 +158,11 @@ export const legalHoldAction = resurgoSchema.enum("legal_hold_action", [
   "placed",
   "released",
 ]);
+
+export const documentRequestStatus = resurgoSchema.enum(
+  "document_request_status",
+  ["requested", "submitted", "completed", "cancelled"],
+);
 
 export const professionalReviewSubject = resurgoSchema.enum(
   "professional_review_subject",

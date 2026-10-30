@@ -20,8 +20,10 @@ import {
   documentContributorStatus,
   documentFormat,
   documentProcessingStatus,
+  documentRequestStatus,
   documentSource,
   legalHoldAction,
+  resourceClassification,
 } from "./enums";
 import { caseResources } from "./resources";
 import { resurgoSchema } from "./system";
@@ -256,6 +258,110 @@ export const documentLegalHoldEvents = resurgoSchema.table(
     check(
       "document_legal_hold_reason_check",
       sql`${table.reasonCode} ~ '^[a-z][a-z0-9_]{1,63}$'`,
+    ),
+  ],
+);
+
+export const documentRequests = resurgoSchema.table(
+  "document_requests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => cases.id, { onDelete: "restrict" }),
+    caseResourceId: uuid("case_resource_id").notNull(),
+    requestedByCaseMembershipId: uuid(
+      "requested_by_case_membership_id",
+    ).notNull(),
+    assignedToCaseMembershipId: uuid("assigned_to_case_membership_id"),
+    classification: resourceClassification("classification").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull(),
+    dueAt: timestamp("due_at", { mode: "date", withTimezone: true }),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("document_requests_case_id_id_unique").on(table.caseId, table.id),
+    unique("document_requests_case_resource_unique").on(
+      table.caseId,
+      table.caseResourceId,
+    ),
+    index("document_requests_case_created_at_idx").on(
+      table.caseId,
+      table.createdAt,
+    ),
+    foreignKey({
+      columns: [table.caseId, table.caseResourceId],
+      foreignColumns: [caseResources.caseId, caseResources.id],
+      name: "document_requests_case_resource_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.caseId, table.requestedByCaseMembershipId],
+      foreignColumns: [caseMemberships.caseId, caseMemberships.id],
+      name: "document_requests_requester_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.caseId, table.assignedToCaseMembershipId],
+      foreignColumns: [caseMemberships.caseId, caseMemberships.id],
+      name: "document_requests_assignee_fk",
+    }).onDelete("restrict"),
+    check(
+      "document_requests_title_check",
+      sql`length(trim(${table.title})) between 1 and 240`,
+    ),
+    check(
+      "document_requests_description_check",
+      sql`length(trim(${table.description})) between 1 and 4000`,
+    ),
+  ],
+);
+
+export const documentRequestEvents = resurgoSchema.table(
+  "document_request_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    caseId: uuid("case_id").notNull(),
+    documentRequestId: uuid("document_request_id").notNull(),
+    status: documentRequestStatus("status").notNull(),
+    actorCaseMembershipId: uuid("actor_case_membership_id").notNull(),
+    documentId: uuid("document_id"),
+    documentVersionId: uuid("document_version_id"),
+    occurredAt: timestamp("occurred_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("document_request_events_request_time_idx").on(
+      table.documentRequestId,
+      table.occurredAt,
+    ),
+    foreignKey({
+      columns: [table.caseId, table.documentRequestId],
+      foreignColumns: [documentRequests.caseId, documentRequests.id],
+      name: "document_request_events_request_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.caseId, table.actorCaseMembershipId],
+      foreignColumns: [caseMemberships.caseId, caseMemberships.id],
+      name: "document_request_events_actor_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.caseId, table.documentId, table.documentVersionId],
+      foreignColumns: [
+        documentVersions.caseId,
+        documentVersions.documentId,
+        documentVersions.id,
+      ],
+      name: "document_request_events_version_fk",
+    }).onDelete("restrict"),
+    check(
+      "document_request_events_version_check",
+      sql`(${table.status} in ('submitted', 'completed') and ${table.documentId} is not null and ${table.documentVersionId} is not null) or (${table.status} in ('requested', 'cancelled') and ${table.documentId} is null and ${table.documentVersionId} is null)`,
     ),
   ],
 );

@@ -19,6 +19,7 @@ import {
   requireCaseAuthorization,
 } from "./authorization";
 import { buildAuditEvent } from "./audit";
+import { invalidateReviewsForEvidenceChange } from "./reviews";
 
 type Database = NodePgDatabase<typeof schema>;
 type DocumentFormat = "pdf" | "docx";
@@ -431,6 +432,12 @@ export async function addDocumentVersion(
       })
       .returning();
     if (!version) throw new Error("Document version creation failed");
+    await invalidateReviewsForEvidenceChange(transaction, {
+      actorCaseMembershipId: authorization.caseMembershipId,
+      actorUserId: input.userId,
+      caseId: input.caseId,
+      supersededDocumentVersionId: latest.id,
+    });
     await transaction.insert(documentProcessingEvents).values({
       actorCaseMembershipId: authorization.caseMembershipId,
       caseId: input.caseId,
