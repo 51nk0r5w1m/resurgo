@@ -223,6 +223,12 @@ export async function transitionDocumentRequest(
       operation: "read",
       userId: input.userId,
     });
+    await transaction.execute(sql`
+      select id from resurgo.document_requests
+      where case_id = ${input.caseId}
+        and id = ${input.documentRequestId}
+      for update
+    `);
     const latestResult = await transaction.execute<{
       status: RequestStatus;
     }>(sql`
