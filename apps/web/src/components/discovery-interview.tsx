@@ -50,15 +50,21 @@ export function DiscoveryInterview({
     event.preventDefault();
     if (!current) return;
     const value = String(new FormData(event.currentTarget).get("answer") ?? "");
-    const response = await fetch(`/api/cases/${caseId}/discovery`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        action: "answer",
-        questionKey: current.key,
-        value,
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`/api/cases/${caseId}/discovery`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "answer",
+          questionKey: current.key,
+          value,
+        }),
+      });
+    } catch {
+      setMessage("That answer could not be saved.");
+      return;
+    }
     if (!response.ok) {
       setMessage("That answer could not be saved.");
       return;
