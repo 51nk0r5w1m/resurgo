@@ -309,7 +309,7 @@ describe.skipIf(!databaseUrl)("Better Auth security boundary", () => {
           },
           body: JSON.stringify({
             name: "Synthetic Rate Limit Client",
-            email,
+            email: `rate-limit-${attempt}-${randomUUID()}@example.test`,
             password,
           }),
         }),

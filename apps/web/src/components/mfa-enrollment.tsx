@@ -14,11 +14,17 @@ export function MfaEnrollment() {
     const password = String(
       new FormData(event.currentTarget).get("password") ?? "",
     );
-    const result = await authClient.twoFactor.enable({
-      password,
-      method: "totp",
-      issuer: "Resurgo",
-    });
+    const result = await authClient.twoFactor
+      .enable({
+        password,
+        method: "totp",
+        issuer: "Resurgo",
+      })
+      .catch(() => undefined);
+    if (!result) {
+      setMessage("Two-step enrollment could not be started. Please try again.");
+      return;
+    }
     if (result.error || result.data?.method !== "totp") {
       setMessage("Two-step enrollment could not be started.");
       return;
@@ -31,10 +37,18 @@ export function MfaEnrollment() {
   async function verify(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const code = String(new FormData(event.currentTarget).get("code") ?? "");
-    const result = await authClient.twoFactor.verifyTotp({
-      code,
-      trustDevice: false,
-    });
+    const result = await authClient.twoFactor
+      .verifyTotp({
+        code,
+        trustDevice: false,
+      })
+      .catch(() => undefined);
+    if (!result) {
+      setMessage(
+        "Two-step verification could not be completed. Please try again.",
+      );
+      return;
+    }
     setMessage(
       result.error
         ? "That code was not valid. Two-step verification remains disabled."
