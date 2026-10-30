@@ -1,0 +1,17 @@
+packages:
+  - apps/*
+  - packages/*
+
+catalogMode: strict
+
+cleanupUnusedCatalogs: true
+
+overrides:
+  esbuild@<=0.24.2: 0.25.12
+
+minimumReleaseAgeExclude:
+  - lucide-react@1.64.0
+
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true

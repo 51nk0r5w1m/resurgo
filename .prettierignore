@@ -1,0 +1,10 @@
+.next
+AGENTS.md
+BACKLOG.md
+coverage
+node_modules
+playwright-report
+pnpm-lock.yaml
+test-results
+docs/brand/*.png
+docs/product-brief.md

@@ -1,0 +1,106 @@
+name: Continuous integration
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "feat/**"
+
+concurrency:
+  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Build and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CI: "true"
+      DATABASE_URL: postgresql://resurgo_ci:synthetic_ci_password@127.0.0.1:5432/resurgo_ci
+      GARAGE_ACCESS_KEY_ID: GK00000000000000000000000000000000
+      GARAGE_BUCKET: resurgo-ci-private
+      GARAGE_ENDPOINT: http://127.0.0.1:3900
+      GARAGE_REGION: garage
+      GARAGE_SECRET_ACCESS_KEY: synthetic-ci-garage-secret-not-for-production
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+      NODE_ENV: test
+      POSTGRES_DB: resurgo_ci
+      POSTGRES_PASSWORD: synthetic_ci_password
+      POSTGRES_USER: resurgo_ci
+    services:
+      postgres:
+        image: postgres:18.6-alpine3.24@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
+        env:
+          POSTGRES_DB: resurgo_ci
+          POSTGRES_PASSWORD: synthetic_ci_password
+          POSTGRES_USER: resurgo_ci
+        options: >-
+          --health-cmd "pg_isready -U resurgo_ci -d resurgo_ci"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+        ports:
+          - 5432:5432
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Install pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 12.16.1
+      - name: Install Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          cache: pnpm
+          node-version: 26.13.0
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check formatting
+        run: pnpm format:check
+      - name: Lint
+        run: pnpm lint
+      - name: Check types
+        run: pnpm typecheck
+      - name: Run unit tests
+        run: pnpm test
+      - name: Validate migrations on an empty database
+        run: pnpm db:validate
+      - name: Apply migrations for integration tests
+        run: pnpm db:migrate
+      - name: Run database integration tests
+        run: pnpm test:integration
+      - name: Verify PostgreSQL container-recreation persistence
+        run: pnpm test:postgres-persistence
+      - name: Build application
+        run: pnpm build
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run browser tests
+        run: pnpm test:e2e
+      - name: Audit dependencies
+        run: pnpm audit --audit-level moderate
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+      - name: Scan committed content
+        run: >-
+          docker run --rm --network none
+          --volume "${{ github.workspace }}:/repo:ro"
+          --workdir /repo
+          --entrypoint /usr/bin/gitleaks
+          zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          git --no-banner --redact
+      - name: Prove synthetic secret detection
+        run: node scripts/test-gitleaks-negative.mjs

@@ -1,0 +1,48 @@
+{
+  "name": "resurgo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Navigate today. Build tomorrow.",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@12.16.1",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "pnpm --filter @resurgo/web build",
+    "db:check": "dotenv -e .env -- pnpm --filter @resurgo/db exec drizzle-kit check",
+    "db:generate": "dotenv -e .env -- pnpm --filter @resurgo/db exec drizzle-kit generate",
+    "db:migrate": "dotenv -e .env -- pnpm --filter @resurgo/db exec drizzle-kit migrate",
+    "db:validate": "dotenv -e .env -- pnpm --filter @resurgo/db exec node scripts/validate-migrations.mjs",
+    "dev": "dotenv -e .env -- pnpm --filter @resurgo/web dev",
+    "env:check": "node scripts/check-env.mjs",
+    "env:init": "node scripts/init-env.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "infra:down": "docker compose --env-file .env -f infra/compose/compose.yaml down",
+    "infra:logs": "docker compose --env-file .env -f infra/compose/compose.yaml logs --follow",
+    "infra:up": "docker compose --env-file .env -f infra/compose/compose.yaml up --detach --wait",
+    "lint": "eslint . --max-warnings 0",
+    "setup:local": "pnpm env:init && pnpm env:check && pnpm infra:up && pnpm db:migrate",
+    "start": "dotenv -e .env -- pnpm --filter @resurgo/web start",
+    "test": "vitest run",
+    "test:integration": "dotenv -e .env -- vitest run --config vitest.integration.config.ts",
+    "test:postgres-persistence": "node scripts/test-postgres-persistence.mjs",
+    "test:e2e": "playwright test",
+    "typecheck": "pnpm --recursive --if-present typecheck"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "dotenv-cli": "11.1.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.4.3",
+    "prettier": "3.9.10",
+    "prettier-plugin-tailwindcss": "0.8.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.12"
+  }
+}

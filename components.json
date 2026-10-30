@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "css": "apps/web/src/app/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@resurgo/ui/components",
+    "utils": "@resurgo/ui/lib/utils",
+    "ui": "@resurgo/ui/components",
+    "lib": "@resurgo/ui/lib",
+    "hooks": "@resurgo/ui/hooks"
+  }
+}
