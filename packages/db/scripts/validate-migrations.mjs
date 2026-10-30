@@ -35,7 +35,9 @@ try {
   });
   const expectedRelations = [
     ["auth", "account"],
+    ["auth", "rate_limit"],
     ["auth", "session"],
+    ["auth", "two_factor"],
     ["auth", "user"],
     ["auth", "verification"],
     ["resurgo", "audit_events"],
@@ -43,10 +45,14 @@ try {
     ["resurgo", "case_resources"],
     ["resurgo", "cases"],
     ["resurgo", "disclosure_consents"],
+    ["resurgo", "discovery_answers"],
+    ["resurgo", "discovery_sessions"],
     ["resurgo", "jurisdictions"],
     ["resurgo", "organization_memberships"],
     ["resurgo", "organizations"],
+    ["resurgo", "recommendations"],
     ["resurgo", "resource_grants"],
+    ["resurgo", "roadmap_items"],
     ["resurgo", "system_metadata"],
   ];
   const relations = await pool.query(`
@@ -85,6 +91,7 @@ try {
       "created_at",
       "updated_at",
     ],
+    rate_limit: ["id", "key", "count", "last_request"],
     session: [
       "id",
       "user_id",
@@ -95,6 +102,15 @@ try {
       "created_at",
       "updated_at",
     ],
+    two_factor: [
+      "id",
+      "user_id",
+      "secret",
+      "backup_codes",
+      "verified",
+      "failed_verification_count",
+      "locked_until",
+    ],
     user: [
       "id",
       "name",
@@ -103,6 +119,7 @@ try {
       "image",
       "created_at",
       "updated_at",
+      "two_factor_enabled",
     ],
     verification: [
       "id",

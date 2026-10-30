@@ -8,10 +8,20 @@ import pg from "pg";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import {
+  decideCaseAuthorization,
   hasEffectiveCaseAccess,
   hasEffectiveResourceAccess,
 } from "./domain/authorization";
 import { createCaseWithOwner } from "./domain/cases";
+import {
+  grantCaseMembership,
+  revokeCaseMembership,
+} from "./domain/memberships";
+import {
+  completeDiscovery,
+  getDiscoveryState,
+  saveDiscoveryAnswer,
+} from "./domain/discovery";
 import * as schema from "./schema";
 
 const { Client, Pool } = pg;
@@ -61,6 +71,7 @@ async function createSyntheticUser(label: string) {
     .values({
       email: `${label}-${randomUUID()}@synthetic.example`,
       name: `Synthetic ${label}`,
+      twoFactorEnabled: true,
     })
     .returning();
 
@@ -127,6 +138,26 @@ async function createVerifiedOrganization(
 }
 
 describe("case and professional security boundaries", () => {
+  test("rejects duplicate memberships for the same user and case", async () => {
+    const owner = await createSyntheticUser("duplicate-membership-owner");
+    const { case: clientCase } = await createCaseWithOwner(database, {
+      jurisdictionCode: "GA-FULTON-SUPERIOR",
+      ownerUserId: owner.id,
+    });
+
+    await expectDatabaseError(
+      database.insert(schema.caseMemberships).values({
+        caseId: clientCase.id,
+        role: "co_client",
+        status: "active",
+        userId: owner.id,
+        validFrom: new Date(),
+      }),
+      "23505",
+      "case_memberships_case_user_unique",
+    );
+  });
+
   test("creates a case and its active owner membership atomically", async () => {
     const owner = await createSyntheticUser("owner");
     const result = await createCaseWithOwner(database, {
@@ -774,6 +805,279 @@ describe("case and professional security boundaries", () => {
       "23503",
       "resource_grants_source_consent_scope_fk",
     );
+  });
+});
+
+describe("central case authorization", () => {
+  test("requires MFA for verified professional case access", async () => {
+    const owner = await createSyntheticUser("mfa-policy-owner");
+    const professional = await createSyntheticUser("mfa-policy-professional");
+    await database
+      .update(schema.user)
+      .set({ twoFactorEnabled: false })
+      .where(eq(schema.user.id, professional.id));
+    const { case: clientCase } = await createCaseWithOwner(database, {
+      jurisdictionCode: "GA-FULTON-SUPERIOR",
+      ownerUserId: owner.id,
+    });
+    const organization = await createVerifiedOrganization(
+      "Synthetic MFA Policy Law",
+      "law_firm",
+      owner.id,
+    );
+    const affiliation = await createProfessionalMembership(
+      professional.id,
+      organization.id,
+    );
+    await database.insert(schema.caseMemberships).values({
+      caseId: clientCase.id,
+      organizationMembershipId: affiliation.id,
+      role: "attorney",
+      status: "active",
+      userId: professional.id,
+      validFrom: new Date(),
+    });
+
+    await expect(
+      decideCaseAuthorization(database, {
+        caseId: clientCase.id,
+        operation: "read",
+        userId: professional.id,
+      }),
+    ).resolves.toEqual({
+      allowed: false,
+      reasonCode: "professional_mfa_required",
+    });
+
+    await database
+      .update(schema.user)
+      .set({ twoFactorEnabled: true })
+      .where(eq(schema.user.id, professional.id));
+    await expect(
+      decideCaseAuthorization(database, {
+        caseId: clientCase.id,
+        operation: "read",
+        userId: professional.id,
+      }),
+    ).resolves.toMatchObject({ allowed: true, role: "attorney" });
+  });
+
+  test("prevents privilege escalation and revalidates concurrent revocation", async () => {
+    const owner = await createSyntheticUser("membership-owner");
+    const client = await createSyntheticUser("membership-client");
+    const target = await createSyntheticUser("membership-target");
+    const { case: clientCase } = await createCaseWithOwner(database, {
+      jurisdictionCode: "GA-DEKALB-SUPERIOR",
+      ownerUserId: owner.id,
+    });
+    const membership = await grantCaseMembership(database, {
+      actorUserId: owner.id,
+      caseId: clientCase.id,
+      role: "co_client",
+      userId: client.id,
+    });
+
+    await expect(
+      grantCaseMembership(database, {
+        actorUserId: client.id,
+        caseId: clientCase.id,
+        role: "co_client",
+        userId: target.id,
+      }),
+    ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
+
+    await Promise.all([
+      decideCaseAuthorization(database, {
+        caseId: clientCase.id,
+        operation: "read",
+        userId: client.id,
+      }),
+      revokeCaseMembership(database, {
+        actorUserId: owner.id,
+        caseId: clientCase.id,
+        membershipId: membership.id,
+      }),
+    ]);
+
+    await expect(
+      decideCaseAuthorization(database, {
+        caseId: clientCase.id,
+        operation: "read",
+        userId: client.id,
+      }),
+    ).resolves.toEqual({
+      allowed: false,
+      reasonCode: "membership_inactive",
+    });
+  });
+});
+
+describe("versioned discovery and roadmap", () => {
+  test("rejects cross-case recommendation and roadmap references", async () => {
+    const owner = await createSyntheticUser("discovery-reference-owner");
+    const first = await createCaseWithOwner(database, {
+      jurisdictionCode: "GA-FULTON-SUPERIOR",
+      ownerUserId: owner.id,
+    });
+    const second = await createCaseWithOwner(database, {
+      jurisdictionCode: "GA-DEKALB-SUPERIOR",
+      ownerUserId: owner.id,
+    });
+
+    await expect(
+      database.insert(schema.recommendations).values({
+        caseId: second.case.id,
+        discoverySessionId: first.discoverySession.id,
+        explanation: "Synthetic cross-case reference must be rejected.",
+        generation: 1,
+        ruleVersion: "synthetic-test",
+        service: "divorce_attorney",
+      }),
+    ).rejects.toThrow();
+
+    const [recommendation] = await database
+      .insert(schema.recommendations)
+      .values({
+        caseId: first.case.id,
+        discoverySessionId: first.discoverySession.id,
+        explanation: "Synthetic same-case recommendation.",
+        generation: 1,
+        ruleVersion: "synthetic-test",
+        service: "divorce_attorney",
+      })
+      .returning();
+    await expect(
+      database.insert(schema.roadmapItems).values({
+        caseId: second.case.id,
+        description: "Synthetic cross-case roadmap reference.",
+        generation: 1,
+        position: 1,
+        recommendationId: recommendation!.id,
+        status: "ready",
+        title: "Synthetic test item",
+      }),
+    ).rejects.toThrow();
+  });
+
+  test("saves and resumes branching answers then creates a deterministic roadmap", async () => {
+    const owner = await createSyntheticUser("discovery-owner");
+    const unrelated = await createSyntheticUser("discovery-unrelated");
+    const { case: clientCase, discoverySession } = await createCaseWithOwner(
+      database,
+      {
+        jurisdictionCode: "GA-FULTON-SUPERIOR",
+        ownerUserId: owner.id,
+      },
+    );
+    await saveDiscoveryAnswer(database, {
+      caseId: clientCase.id,
+      questionKey: "property_status",
+      userId: owner.id,
+      value: "solely_owned",
+    });
+    await saveDiscoveryAnswer(database, {
+      caseId: clientCase.id,
+      questionKey: "property_status",
+      userId: owner.id,
+      value: "jointly_owned",
+    });
+    await saveDiscoveryAnswer(database, {
+      caseId: clientCase.id,
+      questionKey: "mortgage_status",
+      userId: owner.id,
+      value: "yes",
+    });
+    await saveDiscoveryAnswer(database, {
+      caseId: clientCase.id,
+      questionKey: "financial_complexity",
+      userId: owner.id,
+      value: "complex",
+    });
+    await saveDiscoveryAnswer(database, {
+      caseId: clientCase.id,
+      questionKey: "support_interest",
+      userId: owner.id,
+      value: "yes",
+    });
+
+    const resumed = await getDiscoveryState(database, {
+      caseId: clientCase.id,
+      userId: owner.id,
+    });
+    expect(resumed.answers.property_status).toBe("jointly_owned");
+    expect(resumed.session.revision).toBe(5);
+    expect(
+      await database
+        .select()
+        .from(schema.discoveryAnswers)
+        .where(
+          and(
+            eq(schema.discoveryAnswers.discoverySessionId, discoverySession.id),
+            eq(schema.discoveryAnswers.questionKey, "property_status"),
+          ),
+        ),
+    ).toHaveLength(2);
+    const answerEvents = await database
+      .select({
+        action: schema.auditEvents.action,
+        correlationId: schema.auditEvents.correlationId,
+        reasonCode: schema.auditEvents.reasonCode,
+        resourceId: schema.auditEvents.resourceId,
+        resourceType: schema.auditEvents.resourceType,
+      })
+      .from(schema.auditEvents)
+      .where(eq(schema.auditEvents.action, "discovery.answer.saved"));
+    const serializedEvents = JSON.stringify(answerEvents);
+    expect(answerEvents).toHaveLength(5);
+    expect(serializedEvents).not.toContain("jointly_owned");
+    expect(serializedEvents).not.toContain("complex");
+
+    const completed = await completeDiscovery(database, {
+      caseId: clientCase.id,
+      userId: owner.id,
+    });
+    expect(completed.recommendations.map(({ service }) => service)).toEqual([
+      "divorce_attorney",
+      "mortgage_specialist",
+      "financial_specialist",
+      "personal_support",
+    ]);
+    expect(completed.roadmap).toHaveLength(4);
+    expect(completed.roadmap[0]?.status).toBe("ready");
+
+    await expect(
+      getDiscoveryState(database, {
+        caseId: clientCase.id,
+        userId: unrelated.id,
+      }),
+    ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
+  });
+
+  test("completes the no-property branch without a mortgage answer", async () => {
+    const owner = await createSyntheticUser("no-property-owner");
+    const { case: clientCase } = await createCaseWithOwner(database, {
+      jurisdictionCode: "GA-DEKALB-SUPERIOR",
+      ownerUserId: owner.id,
+    });
+    for (const [questionKey, value] of [
+      ["property_status", "no_real_property"],
+      ["financial_complexity", "straightforward"],
+      ["support_interest", "none"],
+    ] as const) {
+      await saveDiscoveryAnswer(database, {
+        caseId: clientCase.id,
+        questionKey,
+        userId: owner.id,
+        value,
+      });
+    }
+    const completed = await completeDiscovery(database, {
+      caseId: clientCase.id,
+      userId: owner.id,
+    });
+    expect(completed.recommendations.map(({ service }) => service)).toEqual([
+      "divorce_attorney",
+    ]);
   });
 });
 

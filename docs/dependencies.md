@@ -35,15 +35,15 @@ this compatibility override.
 | Prettier                       |      3.9.10 | MIT        | Formatting                                                    |
 | Prettier Tailwind plugin       |       0.8.1 | MIT        | Deterministic class ordering                                  |
 | `dotenv-cli`                   |      11.1.0 | MIT        | Root environment injection for workspace commands             |
+| Better Auth / Drizzle adapter  |      1.7.14 | MIT        | Identity, sessions, recovery, verification, and TOTP MFA      |
+| Nodemailer                     |      10.3.1 | MIT-0      | SMTP delivery to the local email-capture service              |
 
 Type packages use their corresponding published MIT licenses:
 `@types/node` 26.6.6, `@types/react` 19.3.0, and `@types/react-dom`
 19.3.0.
 
-The Phase B1 identity schema targets Better Auth 1.7.14 (MIT), the current stable
-release reviewed on 2026-10-30. The runtime and Drizzle adapter are intentionally
-not installed until RES-006 begins; adapter schema validation is an acceptance
-gate for that ticket. PDF.js, pdf-lib, S3 SDK, and ClamAV client packages remain
+Better Auth 1.7.14 is fixed to the reviewed RES-006 release. Runtime schema and
+clean-migration validation are acceptance gates. PDF.js, pdf-lib, S3 SDK, and ClamAV client packages remain
 uninstalled until their implementation tickets begin.
 
 ## Local infrastructure
@@ -52,6 +52,7 @@ uninstalled until their implementation tickets begin.
 | ---------- | ----------------------------------------------------------------------------------------- | ------------------ | -------------------------------------------------------------------- |
 | PostgreSQL | `18.6-alpine3.24@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5` | PostgreSQL License | Official multi-architecture image; loopback-only port                |
 | Garage     | `v2.5.0@sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5`          | AGPL-3.0           | Official `dxflrs/garage`; private single-node local development only |
+| Mailpit    | `v1.32.0@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498`         | MIT                | Loopback-only SMTP and browser inbox for synthetic local email       |
 
 Garage 2.5.0 was selected after verifying that its upstream repository is not
 archived, its default branch was active in October 2026, and the fixed tag is the

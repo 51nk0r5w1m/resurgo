@@ -9,6 +9,8 @@ import {
   Route,
   Scale,
 } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
 
 const steps = [
   {
@@ -53,11 +55,14 @@ export default function HomePage() {
           <a href="#our-approach">Our approach</a>
           <a href="#privacy">Privacy</a>
         </nav>
-        <Button asChild size="sm">
-          <a href="#how-it-works">
-            Explore Resurgo <ArrowRight aria-hidden="true" size={16} />
-          </a>
-        </Button>
+        <div className="header-actions">
+          <Link href="/login">Sign in</Link>
+          <Button asChild size="sm">
+            <Link href="/register">
+              Start privately <ArrowRight aria-hidden="true" size={16} />
+            </Link>
+          </Button>
+        </div>
       </header>
 
       <section className="hero" id="top">
@@ -71,12 +76,12 @@ export default function HomePage() {
           </p>
           <div className="hero-actions">
             <Button asChild size="lg">
-              <a href="#how-it-works">
-                See how it works <ArrowRight aria-hidden="true" size={18} />
-              </a>
+              <Link href="/register">
+                Start privately <ArrowRight aria-hidden="true" size={18} />
+              </Link>
             </Button>
             <Button asChild size="lg" variant="outline">
-              <a href="#our-approach">Read our approach</a>
+              <a href="#how-it-works">See how it works</a>
             </Button>
           </div>
           <p className="scope-note">
@@ -85,11 +90,15 @@ export default function HomePage() {
           </p>
         </div>
         <div className="horizon-art" aria-hidden="true">
-          <div className="sun" />
-          <div className="ridge ridge-back" />
-          <div className="ridge ridge-mid" />
-          <div className="ridge ridge-front" />
-          <div className="path" />
+          <Image
+            className="horizon-scene"
+            data-testid="horizon-scene"
+            fill
+            priority
+            sizes="(max-width: 900px) 100vw, 58vw"
+            src="/images/resurgo-horizon-hero-v2.png"
+            alt=""
+          />
         </div>
       </section>
 

@@ -10,11 +10,13 @@ const compose = await readFile(
 );
 const image = compose.match(/^    image: (postgres:[^\n]+)$/mu)?.[1];
 const volumeTarget = compose.match(
-  /^      - postgres-data:(\/var\/lib\/postgresql\/[^\n]+)$/mu,
+  /^      - postgres-data:(\/var\/lib\/postgresql(?:\/[^\n]+)?)$/mu,
 )?.[1];
 
 if (!image || volumeTarget !== "/var/lib/postgresql/18/docker") {
-  throw new Error("Compose must mount postgres-data at PostgreSQL 18 PGDATA");
+  throw new Error(
+    "Compose must preserve the established PostgreSQL 18 PGDATA mount path",
+  );
 }
 
 const suffix = randomUUID().replaceAll("-", "");

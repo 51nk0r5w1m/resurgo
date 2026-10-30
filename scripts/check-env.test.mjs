@@ -14,6 +14,8 @@ describe("environment validation command", () => {
       {
         encoding: "utf8",
         env: {
+          BETTER_AUTH_SECRET:
+            "synthetic-better-auth-secret-with-more-than-32-characters",
           DATABASE_URL:
             "postgresql://resurgo:synthetic-password@127.0.0.1:5432/resurgo",
           GARAGE_ACCESS_KEY_ID: "GK0123456789ABCDEF0123456789ABCDEF",
@@ -30,6 +32,9 @@ describe("environment validation command", () => {
             "synthetic-postgres-password-with-more-than-24-characters",
           POSTGRES_USER: "resurgo",
           RESURGO_ENV_FILE: join(directory, "absent.env"),
+          SMTP_FROM: "no-reply@resurgo.test",
+          SMTP_HOST: "127.0.0.1",
+          SMTP_PORT: "1025",
         },
       },
     );

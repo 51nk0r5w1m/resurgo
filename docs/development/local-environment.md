@@ -8,6 +8,7 @@
 | -------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------- |
 | Next.js web                | loopback application port                  | application DB role; session secret; quarantine write/released read through storage adapter   |
 | PostgreSQL                 | loopback only                              | one local owner role currently; runtime/migration/audit role separation is a later gate       |
+| Mailpit                    | `127.0.0.1:1025`, UI at `127.0.0.1:8025`   | synthetic local verification/recovery mail only; never a production mail provider             |
 | S3-compatible object store | API on loopback; admin UI opt-in           | distinct web/worker credentials; private quarantine and released buckets; no anonymous policy |
 | ClamAV daemon              | deferred to document-processing checkpoint | will accept streams from the worker only; no host port                                        |
 | Document worker            | deferred to document-processing checkpoint | will have no inbound host port or auth/session secrets                                        |
@@ -35,7 +36,8 @@ that names only project-owned volumes. Health checks gate migrations and tests.
    by version and multi-architecture digest in Compose.
 2. PostgreSQL 18.6 is pinned by version, Alpine version, and image digest.
    Its named volume is mounted at the image-configured PostgreSQL 18
-   `PGDATA` path, `/var/lib/postgresql/18/docker`. The
+   declared volume root, `/var/lib/postgresql`; PostgreSQL 18 stores `PGDATA`
+   beneath it at `/var/lib/postgresql/18/docker`. The
    `pnpm test:postgres-persistence` regression test removes and recreates an
    isolated container and verifies the canary row survives in its named volume.
 3. `pnpm env:init` creates random, ignored local credentials with restrictive
