@@ -185,6 +185,44 @@ export const atlantaDiscoveryQuestions: readonly DiscoveryQuestion[] = [
     placeholder:
       "For example: stable housing, a workable timeline, or understanding shared debts.",
   },
+  {
+    key: "filed_case_reference",
+    module: "stage",
+    type: "text",
+    label: "Filed case reference",
+    prompt:
+      "What case number or filing reference appears on the court paperwork?",
+    why: "A reference helps a professional connect supplied documents to the correct Georgia Superior Court matter.",
+    classification: "legal",
+    required: false,
+    condition: {
+      conditions: [
+        { key: "divorce_stage", operator: "equals", value: "filed" },
+        { key: "divorce_stage", operator: "equals", value: "negotiating" },
+        { key: "divorce_stage", operator: "equals", value: "final_order" },
+      ],
+      operator: "any",
+    },
+    placeholder:
+      "Use only the reference shown on synthetic or supplied case records.",
+  },
+  {
+    key: "next_legal_date",
+    module: "stage",
+    type: "date",
+    label: "Next known legal date",
+    prompt: "Is there a known hearing, mediation, response, or filing date?",
+    why: "Known dates help order the roadmap, but a Georgia attorney must confirm what the date requires.",
+    classification: "legal",
+    required: false,
+    condition: {
+      conditions: [
+        { key: "divorce_stage", operator: "equals", value: "filed" },
+        { key: "divorce_stage", operator: "equals", value: "negotiating" },
+      ],
+      operator: "any",
+    },
+  },
 
   {
     key: "safe_to_contact",
@@ -367,6 +405,43 @@ export const atlantaDiscoveryQuestions: readonly DiscoveryQuestion[] = [
       value: "no_real_property",
     },
   },
+  {
+    key: "current_occupancy",
+    module: "property",
+    type: "single_choice",
+    label: "Current occupancy",
+    prompt: "Who currently lives in the primary property?",
+    why: "Occupancy affects practical coordination, but it does not determine ownership or legal rights.",
+    classification: "legal",
+    required: true,
+    condition: {
+      key: "property_status",
+      operator: "not_equals",
+      value: "no_real_property",
+    },
+    options: [
+      option("both", "Both spouses"),
+      option("client", "Only me"),
+      option("spouse", "Only my spouse"),
+      option("neither", "Neither spouse"),
+      option("varies", "It varies by property"),
+    ],
+  },
+  {
+    key: "property_transition_date",
+    module: "property",
+    type: "date",
+    label: "Property transition date",
+    prompt: "Has a move, listing, sale, or possession date been proposed?",
+    why: "A proposed date can expose dependencies between housing, legal terms, and financing review.",
+    classification: "financial",
+    required: false,
+    condition: {
+      key: "property_status",
+      operator: "not_equals",
+      value: "no_real_property",
+    },
+  },
 
   {
     key: "mortgage_status",
@@ -515,6 +590,17 @@ export const atlantaDiscoveryQuestions: readonly DiscoveryQuestion[] = [
     },
   },
   {
+    key: "monthly_household_income",
+    module: "financial",
+    type: "currency",
+    label: "Current monthly household income",
+    prompt:
+      "What approximate monthly income is currently available to your household?",
+    why: "This unverified planning estimate helps identify missing records; it is not a support, tax, or lending calculation.",
+    classification: "financial",
+    required: false,
+  },
+  {
     key: "asset_types",
     module: "financial",
     type: "multiple_choice",
@@ -549,6 +635,17 @@ export const atlantaDiscoveryQuestions: readonly DiscoveryQuestion[] = [
       option("partial", "I know some but may be missing others"),
       option("uncertain", "I am uncertain about debts or responsibility"),
     ],
+  },
+  {
+    key: "liability_summary",
+    module: "financial",
+    type: "structured_entities",
+    label: "Known liabilities",
+    prompt:
+      "Add the significant debts or continuing obligations you already know about.",
+    why: "A structured list helps identify documents and ownership questions without deciding legal responsibility.",
+    classification: "financial",
+    required: false,
   },
 
   {

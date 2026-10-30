@@ -1,12 +1,14 @@
 import {
-  discoveryQuestions,
+  atlantaDiscoveryQuestions,
+  discoveryModules,
   getAuthorizedCase,
   getDiscoveryState,
+  listAuthorizedDocuments,
 } from "@resurgo/db";
 import { headers } from "next/headers";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { CasePageHeader } from "../../../../components/case-page-header";
 import { DiscoveryInterview } from "../../../../components/discovery-interview";
 import { getAuth, getDatabase } from "../../../../lib/auth";
 
@@ -22,15 +24,20 @@ export default async function DiscoveryPage({
   const { caseId } = await params;
   let caseRecord;
   let state;
+  let documents;
   try {
-    [caseRecord, state] = await Promise.all([
+    [caseRecord, state, documents] = await Promise.all([
       getAuthorizedCase(getDatabase(), { caseId, userId: session.user.id }),
       getDiscoveryState(getDatabase(), { caseId, userId: session.user.id }),
+      listAuthorizedDocuments(getDatabase(), {
+        caseId,
+        userId: session.user.id,
+      }),
     ]);
   } catch {
     notFound();
   }
-  if (!caseRecord || !state) notFound();
+  if (!caseRecord || !state || !documents) notFound();
   const court =
     caseRecord.jurisdictionCode === "GA-FULTON-SUPERIOR"
       ? "Fulton County Superior Court"
@@ -38,32 +45,31 @@ export default async function DiscoveryPage({
         ? "DeKalb County Superior Court"
         : "Court information unavailable";
   return (
-    <main className="dashboard-shell">
-      <header className="dashboard-header">
-        <Link className="brand" href="/dashboard">
-          Resurgo
-        </Link>
-        <nav aria-label="Case navigation">
-          <span>{court}</span>
-          <Link href={`/cases/${caseId}/documents`}>Documents</Link>
-        </nav>
-      </header>
-      <section className="journey-header">
-        <p className="eyebrow">Atlanta pilot · Private case</p>
-        <h1>Navigate today. Build tomorrow.</h1>
-        <p>Your answers stay in this case and save as you go.</p>
-      </section>
+    <main className="case-page discovery-page">
+      <CasePageHeader
+        eyebrow={`Atlanta pilot · ${court}`}
+        summary="A private, adaptive intake that saves each answer and turns applicable facts into explainable coordination steps."
+        title="Let’s understand your situation."
+      />
       <DiscoveryInterview
         caseId={caseId}
-        initialAnswers={state.answers as Record<string, string>}
+        documents={documents
+          .filter(({ processing_status }) => processing_status === "available")
+          .map((document) => ({
+            title: document.title,
+            versionId: document.version_id,
+            versionNumber: document.version_number,
+          }))}
+        initialAnswers={state.answers}
+        initialOutputs={state.outputs.map((output) => ({
+          ...output,
+          type: output.type as "document_request" | "review_trigger",
+        }))}
         initialRecommendations={state.recommendations}
         initialRoadmap={state.roadmap}
         initialStatus={state.session.status}
-        questions={discoveryQuestions.map((question) => ({
-          key: question.key,
-          prompt: question.prompt,
-          options: [...question.options],
-        }))}
+        modules={[...discoveryModules]}
+        questions={[...atlantaDiscoveryQuestions]}
       />
     </main>
   );

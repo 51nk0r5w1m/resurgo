@@ -61,35 +61,108 @@ test("client registers, verifies, creates a private case, and builds a roadmap",
     page.getByText("Fulton County Superior Court").first(),
   ).toBeVisible();
 
-  await page.getByLabel("We own property together").check();
-  await page.getByRole("button", { name: "Save and continue" }).click();
+  const choices: Record<string, string[]> = {
+    "Where are you in the divorce process today?": [
+      "Considering divorce or separation",
+    ],
+    "Do you currently have a Georgia family law attorney?": [
+      "No, I am currently self-represented",
+    ],
+    "Is the selected Superior Court the court connected to your case or expected filing?":
+      ["Yes"],
+    "Is it safe for Resurgo to display case notifications on this device?": [
+      "Yes",
+    ],
+    "Are any of these safety or privacy considerations relevant?": [
+      "None of these",
+    ],
+    "Are children or other dependents affected by this transition?": ["No"],
+    "What real property is involved?": ["A home or property is jointly titled"],
+    "What housing outcome are you currently considering?": [
+      "I want to explore keeping the home",
+    ],
+    "Who appears to hold title to the primary property?": ["Me", "My spouse"],
+    "Who currently lives in the primary property?": ["Both spouses"],
+    "Is a mortgage or home-equity obligation connected to the property?": [
+      "Yes",
+    ],
+    "Who is named on the mortgage obligation?": ["Me", "My spouse"],
+    "Which financing path do you want a specialist to help evaluate?": [
+      "Explore refinancing into my name",
+    ],
+    "Has a qualified mortgage professional reviewed the proposed housing plan?":
+      ["No review has started"],
+    "Which income sources may matter to post-divorce planning?": [
+      "Employment income",
+    ],
+    "Which assets may require organization or review?": ["Real property"],
+    "How confident are you that all significant debts have been identified?": [
+      "I have a clear list",
+    ],
+    "Does either spouse have an ownership interest in a business, partnership, or professional practice?":
+      ["No"],
+    "Which court orders or written terms currently exist?": ["None known"],
+    "Which types of support would you like to explore?": [
+      "Georgia family law attorney",
+      "Divorce-informed mortgage specialist",
+      "Financial planner or divorce financial specialist",
+      "Optional personal-support services",
+    ],
+  };
+  for (let step = 0; step < 45; step += 1) {
+    const reviewHeading = page.getByRole("heading", {
+      name: "Confirm what Resurgo will use.",
+    });
+    if (await reviewHeading.isVisible().catch(() => false)) break;
+    const prompt = (
+      await page.locator(".adaptive-interview-card h2").textContent()
+    )?.trim();
+    if (!prompt) throw new Error("Discovery prompt was not rendered");
+    const selected = choices[prompt];
+    if (!selected) {
+      await page.getByRole("button", { name: "Decide later" }).click();
+      await expect(page.locator(".adaptive-interview-card h2")).not.toHaveText(
+        prompt,
+      );
+      continue;
+    }
+    for (const label of selected)
+      await page.getByLabel(label, { exact: true }).check();
+    await page.getByRole("button", { name: "Save and continue" }).click();
+    await expect(page.locator(".adaptive-interview-card h2")).not.toHaveText(
+      prompt,
+    );
+    if (step === 2) {
+      await page.reload();
+      await expect(page.locator(".adaptive-interview-card h2")).toBeVisible();
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({
+        fullPage: true,
+        path: "artifacts/discovery-desktop.png",
+      });
+      await page.setViewportSize({ height: 844, width: 390 });
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({
+        fullPage: true,
+        path: "artifacts/discovery-mobile.png",
+      });
+      await page.setViewportSize({ height: 720, width: 1280 });
+    }
+  }
   await expect(
-    page.getByRole("heading", { name: /mortgage connected/u }),
+    page.getByRole("heading", { name: "Confirm what Resurgo will use." }),
   ).toBeVisible();
-
-  await page.reload();
+  await page.getByRole("button", { name: "Change" }).first().click();
   await expect(
-    page.getByRole("heading", { name: /mortgage connected/u }),
+    page.getByRole("heading", {
+      name: "Where are you in the divorce process today?",
+    }),
   ).toBeVisible();
-  await page.getByLabel("Yes", { exact: true }).check();
   await page.getByRole("button", { name: "Save and continue" }).click();
-  await page
-    .getByLabel("Business, investments, or complex assets are involved")
-    .check();
-  await page.getByRole("button", { name: "Save and continue" }).click();
-  await page.getByLabel("Yes, include optional support resources").check();
-  await page.getByRole("button", { name: "Save and continue" }).click();
-  await expect(page.getByLabel("4 answers saved")).toBeVisible();
-  await page.getByRole("button", { name: "Change answer" }).last().click();
-  await page.getByLabel("Not right now").check();
-  await page.getByRole("button", { name: "Save change" }).click();
-  await page.getByRole("button", { name: "Change answer" }).last().click();
-  await page.getByLabel("Yes, include optional support resources").check();
-  await page.getByRole("button", { name: "Save change" }).click();
-  await page.getByRole("button", { name: "Build my roadmap" }).click();
+  await page.getByRole("button", { name: "Submit and build my plan" }).click();
 
   await expect(
-    page.getByRole("heading", { name: /coordination team/u }),
+    page.getByRole("heading", { name: /personalized coordination plan/u }),
   ).toBeVisible();
   await expect(
     page.getByText("divorce attorney", { exact: true }),
@@ -104,8 +177,25 @@ test("client registers, verifies, creates a private case, and builds a roadmap",
     page.getByText("personal support", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText(/not legal advice, a mortgage eligibility decision/u),
+    page.getByText(/does not make legal or mortgage eligibility decisions/u),
   ).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      exact: true,
+      name: "Home-retention feasibility review",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      exact: true,
+      name: "Current mortgage statement",
+    }),
+  ).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    fullPage: true,
+    path: "artifacts/personalized-plan-desktop.png",
+  });
 
   await page
     .getByRole("navigation", { name: "Case workspace" })

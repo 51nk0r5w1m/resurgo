@@ -171,6 +171,17 @@ export function evaluateDiscoveryRules(answers: DiscoveryAnswers) {
       ruleId: "GA-DOC-003",
     });
   }
+  if (is(answers, "has_dependents", "yes")) {
+    outputs.push({
+      type: "document_request",
+      code: "parenting_and_support_records",
+      title: "Current parenting and support records",
+      explanation:
+        "Existing parenting arrangements and support terms help a Georgia attorney distinguish current obligations from proposed changes.",
+      classification: "legal",
+      ruleId: "GA-DOC-006",
+    });
+  }
 
   const complexFinances =
     is(answers, "business_interest", "yes") ||
@@ -178,7 +189,9 @@ export function evaluateDiscoveryRules(answers: DiscoveryAnswers) {
     includes(answers, "income_sources", "self_employment") ||
     is(answers, "debt_certainty", "partial") ||
     is(answers, "debt_certainty", "uncertain") ||
-    addressedUncertain(answers, "business_interest");
+    addressedUncertain(answers, "business_interest") ||
+    includes(answers, "desired_services", "financial") ||
+    includes(answers, "desired_services", "forensic");
   if (complexFinances) {
     recommendations.push({
       service: "financial_specialist",
@@ -209,6 +222,36 @@ export function evaluateDiscoveryRules(answers: DiscoveryAnswers) {
         ruleId: "GA-DOC-004",
       },
     );
+  }
+  if (
+    includes(answers, "asset_types", "bank") ||
+    includes(answers, "asset_types", "retirement") ||
+    includes(answers, "asset_types", "investments")
+  ) {
+    outputs.push({
+      type: "document_request",
+      code: "financial_account_statements",
+      title: "Recent financial account statements",
+      explanation:
+        "Recent statements create a source-based inventory for professional review without classifying ownership automatically.",
+      classification: "financial",
+      ruleId: "GA-DOC-007",
+    });
+  }
+  if (
+    includes(answers, "income_sources", "employment") ||
+    includes(answers, "income_sources", "self_employment") ||
+    includes(answers, "income_sources", "investment")
+  ) {
+    outputs.push({
+      type: "document_request",
+      code: "income_records",
+      title: "Current income records",
+      explanation:
+        "Current pay, business, or investment records help qualified professionals verify the income sources reported in discovery.",
+      classification: "financial",
+      ruleId: "GA-DOC-008",
+    });
   }
   if (
     is(answers, "debt_certainty", "partial") ||
@@ -252,6 +295,20 @@ export function evaluateDiscoveryRules(answers: DiscoveryAnswers) {
         "The exact document version should be reviewed before deadlines or obligations are added to the roadmap.",
       classification: "legal",
       ruleId: "GA-DOC-005",
+    });
+  }
+  if (
+    is(answers, "divorce_stage", "filed") ||
+    is(answers, "divorce_stage", "negotiating")
+  ) {
+    outputs.push({
+      type: "document_request",
+      code: "filed_case_documents",
+      title: "Filed pleadings and current case notices",
+      explanation:
+        "Filed documents and notices let counsel verify the court, current posture, and dates instead of relying on recollection.",
+      classification: "legal",
+      ruleId: "GA-DOC-009",
     });
   }
   if (includes(answers, "desired_services", "personal")) {

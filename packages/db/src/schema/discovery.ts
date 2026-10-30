@@ -196,9 +196,10 @@ export const roadmapItems = resurgoSchema.table(
     caseId: uuid("case_id")
       .notNull()
       .references(() => cases.id, { onDelete: "restrict" }),
-    recommendationId: uuid("recommendation_id")
-      .notNull()
-      .references(() => recommendations.id, { onDelete: "restrict" }),
+    recommendationId: uuid("recommendation_id").references(
+      () => recommendations.id,
+      { onDelete: "restrict" },
+    ),
     generation: integer("generation").notNull(),
     position: integer("position").notNull(),
     title: text("title").notNull(),
