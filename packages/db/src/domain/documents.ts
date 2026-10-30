@@ -180,18 +180,37 @@ export async function recordDocumentProcessingEvent(
       operation: "manage",
       userId: input.userId,
     });
-    const [version] = await transaction
-      .select({ id: documentVersions.id })
-      .from(documentVersions)
+    const version = await transaction.execute<{ id: string }>(sql`
+      select id
+      from resurgo.document_versions
+      where case_id = ${input.caseId}
+        and document_id = ${input.documentId}
+        and id = ${input.versionId}
+      for update
+    `);
+    if (!version.rows[0]) throw new AuthorizationDeniedError();
+    const [latest] = await transaction
+      .select({ status: documentProcessingEvents.status })
+      .from(documentProcessingEvents)
       .where(
         and(
-          eq(documentVersions.caseId, input.caseId),
-          eq(documentVersions.documentId, input.documentId),
-          eq(documentVersions.id, input.versionId),
+          eq(documentProcessingEvents.caseId, input.caseId),
+          eq(documentProcessingEvents.documentId, input.documentId),
+          eq(documentProcessingEvents.documentVersionId, input.versionId),
         ),
       )
+      .orderBy(
+        desc(documentProcessingEvents.occurredAt),
+        desc(documentProcessingEvents.id),
+      )
       .limit(1);
-    if (!version) throw new AuthorizationDeniedError();
+    const validTransition =
+      (input.status === "quarantined" && latest === undefined) ||
+      (input.status === "rejected" &&
+        (latest?.status === "quarantined" || latest?.status === "processing"));
+    if (!validTransition) {
+      throw new Error("Invalid document processing status transition");
+    }
     const [event] = await transaction
       .insert(documentProcessingEvents)
       .values({
@@ -602,22 +621,24 @@ export async function recordDocumentLegalHold(
       operation: "manage",
       userId: input.userId,
     });
-    const [document] = await transaction
-      .select({ id: documents.id })
-      .from(documents)
-      .where(
-        and(
-          eq(documents.caseId, input.caseId),
-          eq(documents.id, input.documentId),
-        ),
-      )
-      .limit(1);
-    if (!document) throw new AuthorizationDeniedError();
+    // Serialize the lifecycle decision on the stable document row. The event
+    // table is append-only, so it cannot itself provide a row to lock before
+    // the first hold is placed.
+    const document = await transaction.execute<{ id: string }>(sql`
+      select id
+      from resurgo.documents
+      where case_id = ${input.caseId} and id = ${input.documentId}
+      for update
+    `);
+    if (!document.rows[0]) throw new AuthorizationDeniedError();
     const [latest] = await transaction
       .select({ action: documentLegalHoldEvents.action })
       .from(documentLegalHoldEvents)
       .where(eq(documentLegalHoldEvents.documentId, input.documentId))
-      .orderBy(desc(documentLegalHoldEvents.occurredAt))
+      .orderBy(
+        desc(documentLegalHoldEvents.occurredAt),
+        desc(documentLegalHoldEvents.id),
+      )
       .limit(1);
     if (
       (input.action === "placed" && latest?.action === "placed") ||

@@ -24,6 +24,8 @@ import {
   getAuthorizedAvailableDocumentVersion,
   grantDocumentAccess,
   listAuthorizedDocuments,
+  recordDocumentLegalHold,
+  recordDocumentProcessingEvent,
 } from "./domain/documents";
 import {
   grantCaseMembership,
@@ -1336,6 +1338,75 @@ describe("immutable document and professional review foundations", () => {
         versionId: created.version.id,
       }),
     ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
+  });
+
+  test("rejects terminal processing regressions and serializes legal holds", async () => {
+    const owner = await createSyntheticUser("document-lifecycle-owner");
+    const { case: clientCase } = await createCaseWithOwner(database, {
+      jurisdictionCode: "GA-FULTON-SUPERIOR",
+      ownerUserId: owner.id,
+    });
+    const created = await createDocumentWithVersion(database, {
+      byteSize: 256,
+      caseId: clientCase.id,
+      classification: "legal",
+      confidentiality: "confidential",
+      contentHash: "9".repeat(64),
+      format: "pdf",
+      mimeType: "application/pdf",
+      retentionClass: "synthetic_lifecycle_record",
+      source: "client_upload",
+      title: "Synthetic lifecycle document",
+      userId: owner.id,
+    });
+
+    await database.insert(schema.documentProcessingEvents).values({
+      caseId: clientCase.id,
+      documentId: created.document.id,
+      documentVersionId: created.version.id,
+      status: "available",
+    });
+    await expect(
+      recordDocumentProcessingEvent(database, {
+        caseId: clientCase.id,
+        documentId: created.document.id,
+        failureCode: "synthetic_late_failure",
+        status: "rejected",
+        userId: owner.id,
+        versionId: created.version.id,
+      }),
+    ).rejects.toThrow("Invalid document processing status transition");
+
+    const holdResults = await Promise.allSettled([
+      recordDocumentLegalHold(database, {
+        action: "placed",
+        caseId: clientCase.id,
+        documentId: created.document.id,
+        reasonCode: "synthetic_pending_review",
+        userId: owner.id,
+      }),
+      recordDocumentLegalHold(database, {
+        action: "placed",
+        caseId: clientCase.id,
+        documentId: created.document.id,
+        reasonCode: "synthetic_pending_review",
+        userId: owner.id,
+      }),
+    ]);
+    expect(
+      holdResults.filter(({ status }) => status === "fulfilled"),
+    ).toHaveLength(1);
+    expect(
+      holdResults.filter(({ status }) => status === "rejected"),
+    ).toHaveLength(1);
+    await expect(
+      database
+        .select()
+        .from(schema.documentLegalHoldEvents)
+        .where(
+          eq(schema.documentLegalHoldEvents.documentId, created.document.id),
+        ),
+    ).resolves.toHaveLength(1);
   });
 
   test("preserves exact evidence and immutable history after supersession and affiliation revocation", async () => {

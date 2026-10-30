@@ -76,13 +76,7 @@ function startContainer() {
     ]);
     if (ready.status === 0) {
       requireSuccess(
-        docker([
-          "exec",
-          container,
-          "test",
-          "-f",
-          `${volumeTarget}/PG_VERSION`,
-        ]),
+        docker(["exec", container, "test", "-f", `${volumeTarget}/PG_VERSION`]),
         "PostgreSQL 18 PGDATA location check",
       );
       return;
