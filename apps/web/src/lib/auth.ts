@@ -39,6 +39,10 @@ export function getAuth() {
   return getRuntime().auth;
 }
 
+export function getDatabase() {
+  return getRuntime().database.db;
+}
+
 export async function auditAuthenticationResponse(
   request: Request,
   response: Response,

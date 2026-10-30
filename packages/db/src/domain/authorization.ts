@@ -20,6 +20,120 @@ export interface ResourceAccessInput extends CaseAccessInput {
   resourceId: string;
 }
 
+export type CaseOperation =
+  "read" | "manage" | "membership_grant" | "membership_revoke";
+
+export type CaseAuthorizationDecision =
+  | {
+      allowed: true;
+      caseMembershipId: string;
+      role: string;
+    }
+  | {
+      allowed: false;
+      reasonCode:
+        | "case_access_denied"
+        | "membership_inactive"
+        | "professional_affiliation_inactive"
+        | "professional_mfa_required"
+        | "role_not_permitted";
+    };
+
+export class AuthorizationDeniedError extends Error {
+  readonly code = "RESOURCE_UNAVAILABLE";
+
+  constructor() {
+    super("Resource not found or unavailable");
+    this.name = "AuthorizationDeniedError";
+  }
+}
+
+export async function decideCaseAuthorization(
+  database: Database,
+  input: CaseAccessInput & { operation: CaseOperation },
+): Promise<CaseAuthorizationDecision> {
+  const evaluatedAt = input.evaluatedAt ?? new Date();
+  const result = await database.execute<{
+    case_membership_id: string;
+    role: string;
+    case_active: boolean;
+    membership_active: boolean;
+    professional_active: boolean;
+    professional_mfa: boolean;
+  }>(sql`
+    select
+      case_membership.id as case_membership_id,
+      case_membership.role,
+      case_record.status = 'active' as case_active,
+      (
+        case_membership.status = 'active'
+        and case_membership.valid_from <= ${evaluatedAt}
+        and (case_membership.expires_at is null or case_membership.expires_at > ${evaluatedAt})
+        and case_membership.revoked_at is null
+      ) as membership_active,
+      (
+        case_membership.role not in ${professionalRoles}
+        or (
+          organization_membership.status = 'active'
+          and organization_membership.valid_from <= ${evaluatedAt}
+          and (organization_membership.expires_at is null or organization_membership.expires_at > ${evaluatedAt})
+          and organization_membership.revoked_at is null
+          and organization.pilot_status = 'verified'
+        )
+      ) as professional_active,
+      (
+        case_membership.role not in ${professionalRoles}
+        or auth_user.two_factor_enabled = true
+      ) as professional_mfa
+    from resurgo.case_memberships as case_membership
+    inner join resurgo.cases as case_record
+      on case_record.id = case_membership.case_id
+    inner join auth.user as auth_user
+      on auth_user.id = case_membership.user_id
+    left join resurgo.organization_memberships as organization_membership
+      on organization_membership.id = case_membership.organization_membership_id
+      and organization_membership.user_id = case_membership.user_id
+    left join resurgo.organizations as organization
+      on organization.id = organization_membership.organization_id
+    where case_membership.case_id = ${input.caseId}
+      and case_membership.user_id = ${input.userId}
+    limit 1
+  `);
+  const row = result.rows[0];
+  if (!row || !row.case_active) {
+    return { allowed: false, reasonCode: "case_access_denied" };
+  }
+  if (!row.membership_active) {
+    return { allowed: false, reasonCode: "membership_inactive" };
+  }
+  if (!row.professional_active) {
+    return {
+      allowed: false,
+      reasonCode: "professional_affiliation_inactive",
+    };
+  }
+  if (!row.professional_mfa) {
+    return { allowed: false, reasonCode: "professional_mfa_required" };
+  }
+  if (input.operation !== "read" && row.role !== "owner") {
+    return { allowed: false, reasonCode: "role_not_permitted" };
+  }
+  return {
+    allowed: true,
+    caseMembershipId: row.case_membership_id,
+    role: row.role,
+  };
+}
+
+export async function requireCaseAuthorization(
+  database: Database,
+  input: CaseAccessInput & { operation: CaseOperation },
+) {
+  const decision = await decideCaseAuthorization(database, input);
+  if (!decision.allowed) throw new AuthorizationDeniedError();
+  return decision;
+}
+
 export async function hasEffectiveCaseAccess(
   database: Database,
   input: CaseAccessInput,
@@ -31,6 +145,8 @@ export async function hasEffectiveCaseAccess(
       from resurgo.case_memberships as case_membership
       inner join resurgo.cases as case_record
         on case_record.id = case_membership.case_id
+      inner join auth.user as auth_user
+        on auth_user.id = case_membership.user_id
       left join resurgo.organization_memberships as organization_membership
         on organization_membership.id = case_membership.organization_membership_id
         and organization_membership.user_id = case_membership.user_id
@@ -54,6 +170,7 @@ export async function hasEffectiveCaseAccess(
             )
             and organization_membership.revoked_at is null
             and organization.pilot_status = 'verified'
+            and auth_user.two_factor_enabled = true
           )
         )
     ) as allowed
@@ -76,6 +193,8 @@ export async function hasEffectiveResourceAccess(
       inner join resurgo.case_memberships as case_membership
         on case_membership.case_id = resource_grant.case_id
         and case_membership.id = resource_grant.grantee_case_membership_id
+      inner join auth.user as auth_user
+        on auth_user.id = case_membership.user_id
       left join resurgo.organization_memberships as organization_membership
         on organization_membership.id = case_membership.organization_membership_id
         and organization_membership.user_id = case_membership.user_id
@@ -111,6 +230,7 @@ export async function hasEffectiveResourceAccess(
             )
             and organization_membership.revoked_at is null
             and organization.pilot_status = 'verified'
+            and auth_user.two_factor_enabled = true
           )
         )
         and (

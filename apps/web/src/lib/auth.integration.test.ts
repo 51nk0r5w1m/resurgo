@@ -4,6 +4,7 @@ import { createDatabase } from "@resurgo/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createResurgoAuth } from "./auth-factory";
+import { createCaseApi } from "./case-api";
 import type { AuthEmail } from "./email";
 
 const appUrl = "http://127.0.0.1:3000";
@@ -60,6 +61,34 @@ describe.skipIf(!databaseUrl)("Better Auth security boundary", () => {
       .getSetCookie()
       .map((value) => value.split(";")[0])
       .join("; ");
+  }
+
+  async function registerVerifiedSession(label: string) {
+    const accountEmail = `${label}-${randomUUID()}@example.test`;
+    const accountPassword = "Synthetic case password 42!";
+    const registration = await request("/sign-up/email", {
+      name: `Synthetic ${label}`,
+      email: accountEmail,
+      password: accountPassword,
+    });
+    expect(registration.status).toBe(200);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const verification = [...messages]
+      .reverse()
+      .find(
+        (message) =>
+          message.recipient === accountEmail &&
+          message.subject.includes("Verify"),
+      );
+    const verificationUrl = verification?.text.match(/https?:\/\/\S+/u)?.[0];
+    expect(verificationUrl).toBeDefined();
+    await auth.handler(new Request(verificationUrl!));
+    const login = await request("/sign-in/email", {
+      email: accountEmail,
+      password: accountPassword,
+    });
+    expect(login.status).toBe(200);
+    return responseCookies(login);
   }
 
   beforeAll(async () => {
@@ -318,5 +347,78 @@ describe.skipIf(!databaseUrl)("Better Auth security boundary", () => {
       { cookie: responseCookies(repeatedLogin) },
     );
     expect(replay.status).toBe(401);
+  });
+
+  it("binds case access to the authenticated principal and prevents enumeration", async () => {
+    const ownerCookie = await registerVerifiedSession("case-owner");
+    const unrelatedCookie = await registerVerifiedSession("unrelated-user");
+    const denied: Array<{ actorUserId: string; resourceId: string }> = [];
+    const caseApi = createCaseApi({
+      database: database.db,
+      getSession: async (headers) => {
+        const session = await auth.api.getSession({ headers });
+        return session ? { user: { id: session.user.id } } : null;
+      },
+      auditDenied: async (decision) => {
+        denied.push({
+          actorUserId: decision.actorUserId,
+          resourceId: decision.resourceId,
+        });
+      },
+    });
+
+    const created = await caseApi.create(
+      new Request(`${appUrl}/api/cases`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: ownerCookie,
+        },
+        body: JSON.stringify({ jurisdictionCode: "GA-FULTON-SUPERIOR" }),
+      }),
+    );
+    expect(created.status).toBe(201);
+    const caseId = ((await created.json()) as { case: { id: string } }).case.id;
+
+    const ownerRead = await caseApi.read(
+      new Request(`${appUrl}/api/cases/${caseId}`, {
+        headers: { cookie: ownerCookie },
+      }),
+      caseId,
+    );
+    expect(ownerRead.status).toBe(200);
+
+    const unrelatedRead = await caseApi.read(
+      new Request(`${appUrl}/api/cases/${caseId}`, {
+        headers: { cookie: unrelatedCookie },
+      }),
+      caseId,
+    );
+    const absentRead = await caseApi.read(
+      new Request(`${appUrl}/api/cases/${randomUUID()}`, {
+        headers: { cookie: unrelatedCookie },
+      }),
+      randomUUID(),
+    );
+    expect(unrelatedRead.status).toBe(404);
+    expect(absentRead.status).toBe(404);
+    expect(await unrelatedRead.json()).toEqual(await absentRead.json());
+
+    const unrelatedList = await caseApi.list(
+      new Request(`${appUrl}/api/cases`, {
+        headers: { cookie: unrelatedCookie },
+      }),
+    );
+    expect((await unrelatedList.json()).cases).toEqual([]);
+    expect(denied).toHaveLength(2);
+
+    const unauthenticatedCreate = await caseApi.create(
+      new Request(`${appUrl}/api/cases`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jurisdictionCode: "GA-FULTON-SUPERIOR" }),
+      }),
+    );
+    expect(unauthenticatedCreate.status).toBe(401);
   });
 });

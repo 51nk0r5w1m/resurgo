@@ -8,10 +8,15 @@ import pg from "pg";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import {
+  decideCaseAuthorization,
   hasEffectiveCaseAccess,
   hasEffectiveResourceAccess,
 } from "./domain/authorization";
 import { createCaseWithOwner } from "./domain/cases";
+import {
+  grantCaseMembership,
+  revokeCaseMembership,
+} from "./domain/memberships";
 import * as schema from "./schema";
 
 const { Client, Pool } = pg;
@@ -61,6 +66,7 @@ async function createSyntheticUser(label: string) {
     .values({
       email: `${label}-${randomUUID()}@synthetic.example`,
       name: `Synthetic ${label}`,
+      twoFactorEnabled: true,
     })
     .returning();
 
@@ -774,6 +780,110 @@ describe("case and professional security boundaries", () => {
       "23503",
       "resource_grants_source_consent_scope_fk",
     );
+  });
+});
+
+describe("central case authorization", () => {
+  test("requires MFA for verified professional case access", async () => {
+    const owner = await createSyntheticUser("mfa-policy-owner");
+    const professional = await createSyntheticUser("mfa-policy-professional");
+    await database
+      .update(schema.user)
+      .set({ twoFactorEnabled: false })
+      .where(eq(schema.user.id, professional.id));
+    const { case: clientCase } = await createCaseWithOwner(database, {
+      jurisdictionCode: "GA-FULTON-SUPERIOR",
+      ownerUserId: owner.id,
+    });
+    const organization = await createVerifiedOrganization(
+      "Synthetic MFA Policy Law",
+      "law_firm",
+      owner.id,
+    );
+    const affiliation = await createProfessionalMembership(
+      professional.id,
+      organization.id,
+    );
+    await database.insert(schema.caseMemberships).values({
+      caseId: clientCase.id,
+      organizationMembershipId: affiliation.id,
+      role: "attorney",
+      status: "active",
+      userId: professional.id,
+      validFrom: new Date(),
+    });
+
+    await expect(
+      decideCaseAuthorization(database, {
+        caseId: clientCase.id,
+        operation: "read",
+        userId: professional.id,
+      }),
+    ).resolves.toEqual({
+      allowed: false,
+      reasonCode: "professional_mfa_required",
+    });
+
+    await database
+      .update(schema.user)
+      .set({ twoFactorEnabled: true })
+      .where(eq(schema.user.id, professional.id));
+    await expect(
+      decideCaseAuthorization(database, {
+        caseId: clientCase.id,
+        operation: "read",
+        userId: professional.id,
+      }),
+    ).resolves.toMatchObject({ allowed: true, role: "attorney" });
+  });
+
+  test("prevents privilege escalation and revalidates concurrent revocation", async () => {
+    const owner = await createSyntheticUser("membership-owner");
+    const client = await createSyntheticUser("membership-client");
+    const target = await createSyntheticUser("membership-target");
+    const { case: clientCase } = await createCaseWithOwner(database, {
+      jurisdictionCode: "GA-DEKALB-SUPERIOR",
+      ownerUserId: owner.id,
+    });
+    const membership = await grantCaseMembership(database, {
+      actorUserId: owner.id,
+      caseId: clientCase.id,
+      role: "co_client",
+      userId: client.id,
+    });
+
+    await expect(
+      grantCaseMembership(database, {
+        actorUserId: client.id,
+        caseId: clientCase.id,
+        role: "co_client",
+        userId: target.id,
+      }),
+    ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
+
+    await Promise.all([
+      decideCaseAuthorization(database, {
+        caseId: clientCase.id,
+        operation: "read",
+        userId: client.id,
+      }),
+      revokeCaseMembership(database, {
+        actorUserId: owner.id,
+        caseId: clientCase.id,
+        membershipId: membership.id,
+      }),
+    ]);
+
+    await expect(
+      decideCaseAuthorization(database, {
+        caseId: clientCase.id,
+        operation: "read",
+        userId: client.id,
+      }),
+    ).resolves.toEqual({
+      allowed: false,
+      reasonCode: "membership_inactive",
+    });
   });
 });
 
