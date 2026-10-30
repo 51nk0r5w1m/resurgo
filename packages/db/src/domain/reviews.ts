@@ -883,6 +883,18 @@ export async function recordAttorneyReviewAcknowledgement(
         resourceType: "professional_review_revision",
       }),
     );
+    await transaction.insert(auditEvents).values(
+      buildAuditEvent({
+        actorUserId: input.userId,
+        caseId: input.caseId,
+        eventType: `professional_review.${input.action}`,
+        metadata: {
+          professionalReviewId: input.professionalReviewId,
+          reviewRevisionId: input.reviewRevisionId,
+          statementHash: input.statementHash,
+        },
+      }),
+    );
     return event;
   });
 }
