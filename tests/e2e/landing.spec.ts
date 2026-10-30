@@ -17,6 +17,9 @@ test("shows the branded foundation without future feature controls", async ({
   await expect(
     page.getByText("Privacy by design", { exact: true }),
   ).toBeVisible();
+  await expect(page.getByTestId("horizon-scene")).toBeVisible();
+  await expect(page.locator('[data-landscape-layer="ridge"]')).toHaveCount(3);
+  await expect(page.locator('[data-landscape-layer="path"]')).toHaveCount(1);
   await expect(page.getByRole("link", { name: /sign in/i })).toHaveAttribute(
     "href",
     "/login",

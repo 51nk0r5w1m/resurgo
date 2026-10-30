@@ -360,8 +360,11 @@ a {
 }
 
 .hero {
+  background:
+    radial-gradient(circle at 78% 25%, #f2e8d6 0, transparent 23%),
+    var(--color-ivory);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr);
+  grid-template-columns: minmax(0, 0.92fr) minmax(420px, 1.08fr);
   min-height: calc(100vh - 76px);
   overflow: hidden;
 }
@@ -435,61 +438,18 @@ h2 {
 }
 
 .horizon-art {
-  background: linear-gradient(145deg, #f7f0df, #e7ddc8);
   min-height: 660px;
   overflow: hidden;
   position: relative;
 }
 
-.sun {
-  background: radial-gradient(circle at 42% 38%, #fff8dc, #e8ca95);
-  border-radius: 50%;
-  height: min(30vw, 430px);
-  left: 14%;
-  opacity: 0.8;
+.horizon-scene {
+  bottom: 0;
+  height: 100%;
+  min-width: 760px;
   position: absolute;
-  top: 12%;
-  width: min(30vw, 430px);
-}
-
-.ridge {
-  border-radius: 48% 52% 0 0 / 30% 34% 0 0;
-  bottom: -12%;
-  position: absolute;
-  transform: rotate(-5deg);
-}
-
-.ridge-back {
-  background: #a6ad9e;
-  height: 46%;
-  left: -15%;
-  width: 115%;
-}
-
-.ridge-mid {
-  background: #6e8178;
-  height: 38%;
-  left: 8%;
-  width: 110%;
-}
-
-.ridge-front {
-  background: #27483f;
-  bottom: -20%;
-  height: 40%;
-  left: 32%;
-  width: 95%;
-}
-
-.path {
-  background: var(--color-ivory);
-  border-radius: 50%;
-  bottom: -25%;
-  height: 68%;
-  left: 20%;
-  position: absolute;
-  transform: rotate(-20deg);
-  width: 20%;
+  right: 0;
+  width: 112%;
 }
 
 .section {
