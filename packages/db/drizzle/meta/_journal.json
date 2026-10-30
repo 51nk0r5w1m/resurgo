@@ -85,6 +85,13 @@
       "when": 1793347826878,
       "tag": "0011_enforce_review_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793348428781,
+      "tag": "0012_enforce_single_review_root",
+      "breakpoints": true
     }
   ]
 }

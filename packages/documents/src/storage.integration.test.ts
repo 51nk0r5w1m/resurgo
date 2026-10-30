@@ -28,11 +28,7 @@ const keys = documentObjectKeys({
 
 afterEach(async () => {
   if (!storage) return;
-  await Promise.all(
-    Object.values(keys).map((key) =>
-      storage.delete(key).catch(() => undefined),
-    ),
-  );
+  await Promise.all(Object.values(keys).map((key) => storage.delete(key)));
 });
 
 storageSuite("private S3-compatible storage", () => {
@@ -72,10 +68,9 @@ storageSuite("private S3-compatible storage", () => {
       key: keys.quarantine,
     });
 
-    const objectUrl = new URL(
-      `${garageConfiguration.bucket}/${keys.quarantine}`,
-      `${garageConfiguration.endpoint}/`,
-    );
+    const objectUrl = new URL(garageConfiguration.endpoint!);
+    const endpointPath = objectUrl.pathname.replace(/\/$/u, "");
+    objectUrl.pathname = `${endpointPath}/${garageConfiguration.bucket}/${keys.quarantine}`;
     const response = await fetch(objectUrl);
     expect([401, 403]).toContain(response.status);
   });

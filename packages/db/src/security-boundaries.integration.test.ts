@@ -898,6 +898,14 @@ describe("immutable document and professional review foundations", () => {
         userId: professional.id,
       }),
     ).resolves.toHaveLength(1);
+    await expect(
+      transitionDocumentRequest(database, {
+        caseId: clientCase.id,
+        documentRequestId: request.id,
+        status: "cancelled",
+        userId: professional.id,
+      }),
+    ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
     await database
       .update(schema.disclosureConsents)
       .set({ revokedAt: new Date(), status: "revoked" })
@@ -1163,21 +1171,31 @@ describe("immutable document and professional review foundations", () => {
       subjectType: "mortgage_property",
       userId: owner.id,
     });
-    await appendProfessionalReviewRevision(database, {
-      caseId: clientCase.id,
-      decisionContext: "Synthetic specialist review is underway.",
-      evidence: [
-        {
-          documentId: document.document.id,
-          documentVersionId: document.version.id,
-          purpose: "Current synthetic evidence under review.",
-        },
-      ],
-      professionalReviewId: review.review.id,
-      reviewScope: "Review factual mortgage information.",
-      status: "in_progress",
-      userId: specialist.id,
-    });
+    const concurrentAppends = await Promise.allSettled(
+      [1, 2].map(() =>
+        appendProfessionalReviewRevision(database, {
+          caseId: clientCase.id,
+          decisionContext: "Synthetic specialist review is underway.",
+          evidence: [
+            {
+              documentId: document.document.id,
+              documentVersionId: document.version.id,
+              purpose: "Current synthetic evidence under review.",
+            },
+          ],
+          professionalReviewId: review.review.id,
+          reviewScope: "Review factual mortgage information.",
+          status: "in_progress",
+          userId: specialist.id,
+        }),
+      ),
+    );
+    expect(
+      concurrentAppends.filter(({ status }) => status === "fulfilled"),
+    ).toHaveLength(1);
+    expect(
+      concurrentAppends.filter(({ status }) => status === "rejected"),
+    ).toHaveLength(1);
     await appendProfessionalReviewRevision(database, {
       caseId: clientCase.id,
       decisionContext: "Additional synthetic payoff evidence is required.",
@@ -1220,6 +1238,28 @@ describe("immutable document and professional review foundations", () => {
       status: "completed",
       userId: specialist.id,
     });
+    await expect(
+      appendProfessionalReviewRevision(database, {
+        caseId: clientCase.id,
+        decisionContext: "Duplicate evidence must be rejected.",
+        evidence: [
+          {
+            documentId: document.document.id,
+            documentVersionId: document.version.id,
+            purpose: "First reference.",
+          },
+          {
+            documentId: document.document.id,
+            documentVersionId: document.version.id,
+            purpose: "Conflicting duplicate reference.",
+          },
+        ],
+        professionalReviewId: review.review.id,
+        reviewScope: "This invalid revision must not be stored.",
+        status: "superseded",
+        userId: specialist.id,
+      }),
+    ).rejects.toThrow("Duplicate professional review evidence reference");
     const [attorneyConsent] = await database
       .insert(schema.disclosureConsents)
       .values({
@@ -1280,6 +1320,18 @@ describe("immutable document and professional review foundations", () => {
         supersedesRevisionId: completed.id,
       }),
       "23514",
+    );
+    await expectDatabaseError(
+      database.insert(schema.professionalReviewRevisions).values({
+        caseId: clientCase.id,
+        createdByCaseMembershipId: ownerMembership.id,
+        decisionContext: "Synthetic competing root",
+        professionalReviewId: review.review.id,
+        reviewScope: "A second root must not be accepted.",
+        revision: 1,
+        status: "assigned",
+      }),
+      "23505",
     );
     await expectDatabaseError(
       database.insert(schema.professionalReviewAcknowledgements).values({

@@ -243,7 +243,10 @@ export async function transitionDocumentRequest(
     if (!latest || !transitions[latest.status].includes(input.status)) {
       throw new Error("Invalid document request transition");
     }
-    if (input.status === "completed" && actor.role !== "owner") {
+    if (
+      (input.status === "completed" || input.status === "cancelled") &&
+      actor.role !== "owner"
+    ) {
       throw new AuthorizationDeniedError();
     }
     if (input.status === "submitted" || input.status === "completed") {

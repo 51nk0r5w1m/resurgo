@@ -103,6 +103,12 @@ async function evidenceRows(
   caseId: string,
   evidence: EvidenceReference[],
 ) {
+  const identifiers = evidence.map(
+    ({ documentId, documentVersionId }) => `${documentId}:${documentVersionId}`,
+  );
+  if (new Set(identifiers).size !== identifiers.length) {
+    throw new Error("Duplicate professional review evidence reference");
+  }
   const rows = [];
   for (const reference of evidence) {
     const [row] = await database
@@ -426,6 +432,12 @@ export async function appendProfessionalReviewRevision(
     ) {
       throw new AuthorizationDeniedError();
     }
+    await transaction.execute(sql`
+      select id from resurgo.professional_reviews
+      where case_id = ${input.caseId}
+        and id = ${input.professionalReviewId}
+      for update
+    `);
     const latestResult = await transaction.execute<{
       id: string;
       revision: number;
@@ -528,7 +540,7 @@ export async function invalidateReviewsForEvidenceChange(
             and newer.professional_review_id = revision.professional_review_id
             and newer.revision > revision.revision
         )
-      for update of revision
+      for update of review
     `);
     for (const current of result.rows) {
       const [invalidated] = await transaction

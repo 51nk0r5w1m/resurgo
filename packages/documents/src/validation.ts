@@ -84,6 +84,9 @@ async function validateDocx(bytes: Uint8Array): Promise<ValidatedDocument> {
       ) {
         throw new Error("OOXML archive contains an unsafe path");
       }
+      if (names.has(entry.filename)) {
+        throw new Error("OOXML archive contains duplicate entry names");
+      }
       names.add(entry.filename);
       uncompressedBytes += entry.uncompressedSize;
       if (uncompressedBytes > maximumOoxmlUncompressedBytes) {

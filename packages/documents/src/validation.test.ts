@@ -25,6 +25,23 @@ async function syntheticDocx(extra?: { name: string; content: string }) {
   return new Uint8Array(await (await writer.close()).arrayBuffer());
 }
 
+async function syntheticDocxWithDuplicateEntry() {
+  const bytes = Buffer.from(
+    await syntheticDocx({
+      name: "word/conflict.xml",
+      content: "<w:document>conflicting duplicate</w:document>",
+    }),
+  );
+  const sourceName = Buffer.from("word/conflict.xml");
+  const duplicateName = Buffer.from("word/document.xml");
+  let offset = bytes.indexOf(sourceName);
+  while (offset >= 0) {
+    duplicateName.copy(bytes, offset);
+    offset = bytes.indexOf(sourceName, offset + sourceName.length);
+  }
+  return new Uint8Array(bytes);
+}
+
 describe("document structural validation", () => {
   it("accepts a synthetic PDF and native DOCX", async () => {
     await expect(
@@ -76,6 +93,12 @@ describe("document structural validation", () => {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       ),
     ).rejects.toThrow(/not permitted/u);
+    await expect(
+      validateDocumentStructure(
+        await syntheticDocxWithDuplicateEntry(),
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ),
+    ).rejects.toThrow(/duplicate entry/u);
   });
 
   it("derives only opaque, server-owned private object keys", () => {
