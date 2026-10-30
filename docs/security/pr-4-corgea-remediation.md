@@ -7,7 +7,7 @@
 **Scope:** Checkpoint B1 remediation only; no authentication runtime or document
 features were added.
 
-Nineteen inline comments across the original and remediation scans were reviewed
+Twenty-one inline comments across the original and remediation scans were reviewed
 and deduplicated into the findings below. No Corgea patch was applied without
 checking the current image, schema, migrations, and runtime behavior.
 
@@ -28,6 +28,8 @@ checking the current image, schema, migrations, and runtime behavior.
 | `4420904955`, `4420905242` case status                        | Valid duplicates                             | Current membership and grants could remain effective after a case paused or closed                                                                                           | Join the case in both decisions and require `status = 'active'`                                                                       | Integration test pauses a case and proves both case and granted-resource access deny                                       | `f4a4ef5` |
 | `4420905235` owner-basis grant                                | Valid                                        | `case_owner` basis was not tied to the owner role and identity                                                                                                               | Add forward migration `0004` with a database trigger and repeat the owner role/identity condition at the policy boundary              | Integration test creates a valid `co_client` and proves a `case_owner` grant for it fails with SQLSTATE `23514`            | `f4a4ef5` |
 | `4420905355` child-process termination                        | Valid                                        | `spawnSync` can return `status: null` and a termination signal without an `error` object                                                                                     | Detect and surface the command and termination signal before status-specific canary assertions                                        | Unit/CI execution of the negative scanner harness; signal branch also has deterministic code-inspection evidence           | `f4a4ef5` |
+| `4420925208` professional owner denial                        | False positive                               | A user has one case membership per case; owner grants require that membership's `owner` role, so the professional-affiliation predicate is not applied to owners             | No code change; retain the owner role and owner-identity checks at both database and policy boundaries                                | Atomic owner creation plus owner-basis and grant-lifecycle integration tests                                               | `f4a4ef5` |
+| `4420925647` migration cleanup masking                        | Valid                                        | Pool/admin cleanup in nested `finally` blocks could replace the original validation or migration error                                                                       | Capture the primary failure, attempt every cleanup independently, always end connected clients, and rethrow the original failure      | Successful clean migration validation plus deterministic error-preservation control flow                                   | `845b8a0` |
 
 ## Migration integrity
 
