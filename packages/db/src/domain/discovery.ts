@@ -304,14 +304,14 @@ export async function completeDiscovery(
     }
     const answers = await latestAnswers(transaction, session.id);
     const visibleQuestions = visibleDiscoveryQuestions(answers);
-      const visibleAnswers = Object.fromEntries(
-        visibleQuestions
-          .filter(({ key }) => answers[key] !== undefined)
-          .map(({ key }) => [key, answers[key]]),
-      );
-      const missing = visibleQuestions
-        .map(({ key }) => key)
-        .filter((key) => answers[key] === undefined);
+    const visibleAnswers = Object.fromEntries(
+      visibleQuestions
+        .filter(({ key }) => answers[key] !== undefined)
+        .map(({ key }) => [key, answers[key]]),
+    );
+    const missing = visibleQuestions
+      .map(({ key }) => key)
+      .filter((key) => answers[key] === undefined);
     if (missing.length > 0) throw new Error("Discovery is incomplete");
 
     const generation = session.revision;

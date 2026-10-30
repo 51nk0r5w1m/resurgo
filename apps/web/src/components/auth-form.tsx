@@ -91,8 +91,6 @@ export function AuthForm({
       setMessage(
         "We could not complete your request. Check your connection and try again.",
       );
-    } catch {
-      setMessage("Something went wrong. Please try again.");
     } finally {
       setPending(false);
     }

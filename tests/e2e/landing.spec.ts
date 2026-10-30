@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 test("shows the branded foundation without future feature controls", async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
   const response = await page.goto("/");
 
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
@@ -18,8 +19,10 @@ test("shows the branded foundation without future feature controls", async ({
     page.getByText("Privacy by design", { exact: true }),
   ).toBeVisible();
   await expect(page.getByTestId("horizon-scene")).toBeVisible();
-  await expect(page.locator('[data-landscape-layer="ridge"]')).toHaveCount(3);
-  await expect(page.locator('[data-landscape-layer="path"]')).toHaveCount(1);
+  await expect(page.getByTestId("horizon-scene")).toHaveAttribute(
+    "src",
+    /resurgo-horizon-hero-v2/u,
+  );
   await expect(page.getByRole("link", { name: /sign in/i })).toHaveAttribute(
     "href",
     "/login",
@@ -31,6 +34,10 @@ test("shows the branded foundation without future feature controls", async ({
   expect(response?.headers()["x-frame-options"]).toBe("DENY");
   expect(response?.headers()["content-security-policy"]).toContain(
     "object-src 'none'",
+  );
+  await expect(page.locator(".hero")).toHaveScreenshot(
+    "resurgo-landing-hero.png",
+    { animations: "disabled" },
   );
 });
 

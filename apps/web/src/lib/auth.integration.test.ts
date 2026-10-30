@@ -162,6 +162,37 @@ describe.skipIf(!databaseUrl)("Better Auth security boundary", () => {
     expect(await known.json()).toEqual(await unknown.json());
   });
 
+  it("does not report successful registration when verification delivery fails", async () => {
+    const deliveryFailureEmail = `delivery-failure-${randomUUID()}@example.test`;
+    const deliveryFailureAuth = createResurgoAuth({
+      appUrl,
+      database: database.db,
+      emailSender: async () => {
+        throw new Error("Synthetic delivery failure");
+      },
+      secret:
+        "synthetic-delivery-failure-secret-0123456789abcdef0123456789abcdef",
+      secureCookies: false,
+    });
+    const response = await deliveryFailureAuth.handler(
+      new Request(`${appUrl}/api/auth/sign-up/email`, {
+        body: JSON.stringify({
+          email: deliveryFailureEmail,
+          name: "Synthetic Delivery Failure",
+          password,
+        }),
+        headers: {
+          "content-type": "application/json",
+          origin: appUrl,
+          "x-forwarded-for": "192.0.2.250",
+        },
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(500);
+  });
+
   it("uses recovery tokens once and revokes existing sessions", async () => {
     const signIn = await request("/sign-in/email", { email, password });
     const oldCookie = signIn.headers.get("set-cookie")!.split(";")[0]!;

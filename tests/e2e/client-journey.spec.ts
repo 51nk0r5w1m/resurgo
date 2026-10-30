@@ -76,6 +76,13 @@ test("client registers, verifies, creates a private case, and builds a roadmap",
   await page.getByRole("button", { name: "Save and continue" }).click();
   await page.getByLabel("Yes, include optional support resources").check();
   await page.getByRole("button", { name: "Save and continue" }).click();
+  await expect(page.getByLabel("4 answers saved")).toBeVisible();
+  await page.getByRole("button", { name: "Change answer" }).last().click();
+  await page.getByLabel("Not right now").check();
+  await page.getByRole("button", { name: "Save change" }).click();
+  await page.getByRole("button", { name: "Change answer" }).last().click();
+  await page.getByLabel("Yes, include optional support resources").check();
+  await page.getByRole("button", { name: "Save change" }).click();
   await page.getByRole("button", { name: "Build my roadmap" }).click();
 
   await expect(

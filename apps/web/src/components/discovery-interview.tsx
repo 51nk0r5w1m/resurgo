@@ -35,6 +35,7 @@ export function DiscoveryInterview({
   );
   const [roadmap, setRoadmap] = useState(initialRoadmap);
   const [message, setMessage] = useState("");
+  const [editingKey, setEditingKey] = useState<string | null>(null);
   const visible = useMemo(
     () =>
       questions.filter(
@@ -44,7 +45,12 @@ export function DiscoveryInterview({
       ),
     [answers, questions],
   );
-  const current = visible.find(({ key }) => answers[key] === undefined);
+  const current =
+    visible.find(({ key }) => key === editingKey) ??
+    visible.find(({ key }) => answers[key] === undefined);
+  const savedVisibleAnswers = visible.filter(
+    ({ key }) => answers[key] !== undefined,
+  ).length;
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -69,7 +75,14 @@ export function DiscoveryInterview({
       setMessage("That answer could not be saved.");
       return;
     }
-    setAnswers((existing) => ({ ...existing, [current.key]: value }));
+    setAnswers((existing) => {
+      const updated = { ...existing, [current.key]: value };
+      if (current.key === "property_status" && value === "no_real_property") {
+        delete updated.mortgage_status;
+      }
+      return updated;
+    });
+    setEditingKey(null);
     setMessage("Saved privately. You can return and resume at any time.");
   }
 
@@ -136,11 +149,11 @@ export function DiscoveryInterview({
     <section className="interview-card">
       <div
         className="progress-track"
-        aria-label={`${Object.keys(answers).length} answers saved`}
+        aria-label={`${savedVisibleAnswers} answers saved`}
       >
         <span
           style={{
-            width: `${(Object.keys(answers).length / visible.length) * 100}%`,
+            width: `${(savedVisibleAnswers / visible.length) * 100}%`,
           }}
         />
       </div>
@@ -152,22 +165,46 @@ export function DiscoveryInterview({
             <legend className="sr-only">Choose one answer</legend>
             {current.options.map(([value, label]) => (
               <label className="answer-option" key={value}>
-                <input name="answer" required type="radio" value={value} />
+                <input
+                  defaultChecked={answers[current.key] === value}
+                  name="answer"
+                  required
+                  type="radio"
+                  value={value}
+                />
                 <span>{label}</span>
               </label>
             ))}
           </fieldset>
           <button className="button button-primary" type="submit">
-            Save and continue
+            {editingKey ? "Save change" : "Save and continue"}
           </button>
         </form>
       ) : (
         <div>
           <p className="eyebrow">Discovery saved</p>
           <h2>Build your first roadmap</h2>
-          <p>
-            Resurgo will apply transparent Atlanta pilot rules to your answers.
-          </p>
+          <p>Review your answers before Resurgo builds the roadmap.</p>
+          <dl className="answer-review">
+            {visible.map((question) => {
+              const selected = question.options.find(
+                ([value]) => value === answers[question.key],
+              );
+              return (
+                <div key={question.key}>
+                  <dt>{question.prompt}</dt>
+                  <dd>{selected?.[1]}</dd>
+                  <button
+                    className="button button-secondary"
+                    onClick={() => setEditingKey(question.key)}
+                    type="button"
+                  >
+                    Change answer
+                  </button>
+                </div>
+              );
+            })}
+          </dl>
           <button
             className="button button-primary"
             onClick={complete}

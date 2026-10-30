@@ -9,6 +9,7 @@ import {
   Route,
   Scale,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 const steps = [
@@ -89,58 +90,15 @@ export default function HomePage() {
           </p>
         </div>
         <div className="horizon-art" aria-hidden="true">
-          <svg
+          <Image
             className="horizon-scene"
             data-testid="horizon-scene"
-            preserveAspectRatio="xMidYMax slice"
-            viewBox="0 0 900 720"
-          >
-            <defs>
-              <radialGradient id="resurgo-sun" cx="42%" cy="38%" r="62%">
-                <stop offset="0" stopColor="#fffaf0" />
-                <stop offset="0.72" stopColor="#ead9bc" />
-                <stop offset="1" stopColor="#e2ceb0" stopOpacity="0.42" />
-              </radialGradient>
-              <linearGradient id="ridge-back" x1="0" x2="1" y1="0" y2="1">
-                <stop offset="0" stopColor="#d6d4c8" />
-                <stop offset="1" stopColor="#a8ada1" />
-              </linearGradient>
-              <linearGradient id="ridge-mid" x1="0" x2="1" y1="0" y2="1">
-                <stop offset="0" stopColor="#89988c" />
-                <stop offset="1" stopColor="#536d64" />
-              </linearGradient>
-              <linearGradient id="ridge-front" x1="0" x2="0.9" y1="0" y2="1">
-                <stop offset="0" stopColor="#405f55" />
-                <stop offset="1" stopColor="#173b34" />
-              </linearGradient>
-            </defs>
-            <circle cx="430" cy="220" fill="url(#resurgo-sun)" r="176" />
-            <path
-              d="M0 370 C108 344 160 350 244 326 C328 302 384 344 458 326 C548 304 610 260 688 284 C766 308 828 283 900 266 L900 720 L0 720 Z"
-              fill="url(#ridge-back)"
-              data-landscape-layer="ridge"
-            />
-            <path
-              d="M0 418 C100 392 158 414 240 382 C318 352 382 374 454 354 C548 328 592 292 668 320 C760 352 820 326 900 312 L900 720 L0 720 Z"
-              fill="url(#ridge-mid)"
-              data-landscape-layer="ridge"
-            />
-            <path
-              d="M0 520 C98 470 180 486 258 452 C340 416 410 438 482 420 C588 392 646 414 724 384 C802 354 850 364 900 350 L900 720 L0 720 Z"
-              fill="url(#ridge-front)"
-              data-landscape-layer="ridge"
-            />
-            <path
-              d="M650 335 C720 359 710 385 622 402 C523 421 505 446 594 469 C716 500 694 544 570 580 C494 602 429 652 376 720 L548 720 C588 668 646 636 730 608 C876 559 850 487 714 457 C646 442 660 424 760 403 C868 379 822 346 716 324 Z"
-              fill="#fbf8ef"
-              data-landscape-layer="path"
-            />
-            <g fill="#0d2925" transform="translate(744 526)">
-              <circle cx="12" cy="9" r="8" />
-              <path d="M6 20 C7 15 17 15 19 20 L23 58 L17 58 L15 80 L10 80 L8 58 L2 58 Z" />
-              <path d="M5 26 L-2 53 L3 55 L10 34 M19 26 L27 50 L22 53 L14 34" />
-            </g>
-          </svg>
+            fill
+            priority
+            sizes="(max-width: 900px) 100vw, 58vw"
+            src="/images/resurgo-horizon-hero-v2.png"
+            alt=""
+          />
         </div>
       </section>
 

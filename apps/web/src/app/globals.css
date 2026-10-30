@@ -233,6 +233,37 @@ a {
   height: 100%;
   transition: width 200ms ease;
 }
+
+.answer-review {
+  display: grid;
+  gap: 0.85rem;
+  margin: 1.5rem 0;
+}
+
+.answer-review > div {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 0.35rem 1rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding-bottom: 0.85rem;
+}
+
+.answer-review dt {
+  font-weight: 650;
+  grid-column: 1;
+}
+
+.answer-review dd {
+  color: var(--muted-foreground);
+  grid-column: 1;
+  margin: 0;
+}
+
+.answer-review .button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
 .recommendation-list {
   display: grid;
   gap: 1rem;
@@ -403,7 +434,7 @@ h3 {
 
 h1 {
   color: #0d312c;
-  font-size: clamp(3.5rem, 6.8vw, 7.2rem);
+  font-size: clamp(3.5rem, 5.2vw, 5.8rem);
   letter-spacing: -0.055em;
   line-height: 0.92;
   margin-bottom: 2rem;
@@ -444,12 +475,8 @@ h2 {
 }
 
 .horizon-scene {
-  bottom: 0;
-  height: 100%;
-  min-width: 760px;
-  position: absolute;
-  right: 0;
-  width: 112%;
+  object-fit: cover;
+  object-position: 58% center;
 }
 
 .section {

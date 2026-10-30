@@ -54,7 +54,7 @@ export async function auditAuthenticationResponse(
     "/send-verification-email": "auth.email_verification.requested",
   };
   const action = actionByPath[path];
-  if (!action || (response.ok && path === "/sign-in/email")) return;
+  if (!action) return;
 
   await recordAuthEvent(getRuntime().database.db, {
     action,

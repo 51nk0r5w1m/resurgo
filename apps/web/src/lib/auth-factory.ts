@@ -16,13 +16,6 @@ export function createResurgoAuth(input: {
   secret: string;
   secureCookies: boolean;
 }) {
-  const sendWithoutBlocking = (message: Parameters<AuthEmailSender>[0]) => {
-    void input.emailSender(message).catch(() => {
-      // Delivery failures are intentionally generic: messages can contain tokens.
-      console.error("Authentication email delivery failed.");
-    });
-  };
-
   return betterAuth({
     appName: "Resurgo",
     baseURL: input.appUrl,
@@ -85,12 +78,11 @@ export function createResurgoAuth(input: {
       resetPasswordTokenExpiresIn: 30 * 60,
       revokeSessionsOnPasswordReset: true,
       async sendResetPassword({ user, url }) {
-        sendWithoutBlocking({
+        await input.emailSender({
           recipient: user.email,
           subject: "Reset your Resurgo password",
           text: `A password reset was requested for your Resurgo account. This link expires in 30 minutes and can be used once:\n\n${url}\n\nIf you did not request this, you can ignore this message.`,
         });
-        await Promise.resolve();
       },
       async onPasswordReset({ user }) {
         await recordAuthEvent(input.database, {
@@ -104,12 +96,11 @@ export function createResurgoAuth(input: {
       expiresIn: 30 * 60,
       autoSignInAfterVerification: false,
       async sendVerificationEmail({ user, url }) {
-        sendWithoutBlocking({
+        await input.emailSender({
           recipient: user.email,
           subject: "Verify your Resurgo email",
           text: `Verify your email to activate your Resurgo account. This link expires in 30 minutes:\n\n${url}`,
         });
-        await Promise.resolve();
       },
       async afterEmailVerification(user) {
         await recordAuthEvent(input.database, {
