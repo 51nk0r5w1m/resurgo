@@ -13,9 +13,9 @@ const volumeTarget = compose.match(
   /^      - postgres-data:(\/var\/lib\/postgresql(?:\/[^\n]+)?)$/mu,
 )?.[1];
 
-if (!image || volumeTarget !== "/var/lib/postgresql") {
+if (!image || volumeTarget !== "/var/lib/postgresql/18/docker") {
   throw new Error(
-    "Compose must preserve the established PostgreSQL 18 volume root",
+    "Compose must preserve the established PostgreSQL 18 PGDATA target",
   );
 }
 
@@ -81,7 +81,7 @@ function startContainer() {
           container,
           "test",
           "-f",
-          "/var/lib/postgresql/18/docker/PG_VERSION",
+          `${volumeTarget}/PG_VERSION`,
         ]),
         "PostgreSQL 18 PGDATA location check",
       );

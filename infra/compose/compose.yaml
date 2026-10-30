@@ -96,7 +96,7 @@ services:
     security_opt:
       - no-new-privileges:true
     volumes:
-      - postgres-data:/var/lib/postgresql
+      - postgres-data:/var/lib/postgresql/18/docker
     networks:
       - default
       - document-internal

@@ -108,9 +108,20 @@ export async function decideCaseAuthorization(
       case when case_membership.role = 'owner' then 0 else 1 end,
       case_membership.created_at,
       case_membership.id
-    limit 1
   `);
-  const row = result.rows[0];
+  // The schema prevents duplicate user/case memberships. Still evaluate every
+  // returned candidate so authorization remains deterministic if legacy data
+  // predates that constraint or a future lifecycle model permits history rows.
+  // An eligible membership always wins over an ineligible historical row.
+  const row =
+    result.rows.find(
+      (candidate) =>
+        candidate.case_active &&
+        candidate.membership_active &&
+        candidate.professional_active &&
+        candidate.professional_mfa &&
+        (input.operation === "read" || candidate.role === "owner"),
+    ) ?? result.rows[0];
   if (!row || !row.case_active) {
     return { allowed: false, reasonCode: "case_access_denied" };
   }

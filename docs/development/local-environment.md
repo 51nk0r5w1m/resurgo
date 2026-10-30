@@ -34,9 +34,8 @@ that names only project-owned volumes. Health checks gate migrations and tests.
 1. Garage 2.5.0 (AGPL-3.0) is the local S3-compatible service. The image is pinned
    by version and multi-architecture digest in Compose.
 2. PostgreSQL 18.6 is pinned by version, Alpine version, and image digest.
-   Its named volume is mounted at the image-configured volume root,
-   `/var/lib/postgresql`; PostgreSQL 18 stores `PGDATA` beneath it at
-   `/var/lib/postgresql/18/docker`. The
+   Its named volume is mounted at `/var/lib/postgresql/18/docker`, matching the
+   pinned PostgreSQL 18 image's configured `PGDATA`. The
    `pnpm test:postgres-persistence` regression test removes and recreates an
    isolated container and verifies the canary row survives in its named volume.
 3. `pnpm env:init` creates random, ignored local credentials with restrictive
