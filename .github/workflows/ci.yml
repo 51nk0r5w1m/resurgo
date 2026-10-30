@@ -91,6 +91,8 @@ jobs:
         run: pnpm test:postgres-persistence
       - name: Build application
         run: pnpm build
+      - name: Seed the deterministic design-partner demonstration
+        run: pnpm demo:seed
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Run browser tests

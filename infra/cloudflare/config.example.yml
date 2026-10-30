@@ -1,0 +1,11 @@
+# Copy outside source control to ~/.cloudflared/config.yml after creating a
+# named tunnel. Do not commit the real tunnel UUID or credentials path.
+tunnel: REPLACE_WITH_TUNNEL_UUID
+credentials-file: /home/REPLACE/.cloudflared/REPLACE_WITH_TUNNEL_UUID.json
+
+ingress:
+  - hostname: demo.example.com
+    service: http://127.0.0.1:3000
+    originRequest:
+      noTLSVerify: false
+  - service: http_status:404

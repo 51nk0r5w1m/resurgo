@@ -18,7 +18,7 @@ this compatibility override.
 | pnpm                           |     12.16.1 | MIT          | Workspace package manager                                       |
 | Next.js / `eslint-config-next` |      16.4.3 | MIT          | App Router application and lint rules                           |
 | React / React DOM              |      19.3.1 | MIT          | User interface runtime                                          |
-| TypeScript                     |       6.0.3 | Apache-2.0   | Newest release supported by Next.js's TypeScript ESLint chain   |
+| TypeScript                     |       5.9.3 | Apache-2.0   | Strict compiler supported by Next.js webpack production builds  |
 | Tailwind CSS / PostCSS adapter |       4.3.3 | MIT          | Design tokens and utility CSS                                   |
 | Drizzle ORM                    |      0.45.4 | Apache-2.0   | Typed PostgreSQL access                                         |
 | Drizzle Kit                    |     0.31.11 | MIT          | Migration generation and validation                             |
@@ -43,6 +43,7 @@ this compatibility override.
 | Docxodus                       |      12.6.2 | MIT          | Browser-side native DOCX rendering and deterministic comparison |
 | React Docxodus Viewer          |       0.7.0 | MIT          | Paginated DOCX viewer, tracked changes, and review controls     |
 | pdf-lib                        |      1.17.1 | MIT          | Server-side PDF structural parsing/manipulation                 |
+| docx                           |      9.15.0 | MIT          | Deterministic synthetic DOCX generation for the local demo      |
 | ZIP.js                         |      2.24.0 | BSD-3-Clause | Bounded native DOCX/OOXML archive inspection                    |
 | fast-xml-parser                |      5.11.2 | MIT          | Required DOCX XML-part parsing and structural validation        |
 | `@napi-rs/canvas`              |      1.0.13 | MIT          | Worker-only PDF page rasterization                              |

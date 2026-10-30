@@ -30,6 +30,12 @@ export default async function DashboardPage() {
         <p className="eyebrow">Private workspace</p>
         <h1>Welcome, {session.user.name}.</h1>
         <p>Start your transition without inviting or notifying a spouse.</p>
+        {session.user.email.endsWith(".demo@resurgo.local") && (
+          <p className="dashboard-demo-notice">
+            Fictional demonstration account — no real client or professional
+            information is present.
+          </p>
+        )}
       </section>
       <section className="dashboard-grid">
         {invitations.map((invitation) => (
@@ -75,8 +81,8 @@ export default async function DashboardPage() {
                 : "DeKalb County"}
             </h2>
             <p>
-              <Link href={`/cases/${caseRecord.id}/discovery`}>
-                Continue guided discovery
+              <Link href={`/cases/${caseRecord.id}`}>
+                Open populated case workspace
               </Link>
             </p>
           </article>

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "assets:docxodus": "node scripts/copy-docxodus-runtime.mjs",
-    "build": "pnpm assets:docxodus && next build",
+    "build": "pnpm assets:docxodus && next build --webpack",
     "dev": "pnpm assets:docxodus && next dev --hostname 127.0.0.1",
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "next typegen && tsc --noEmit"
@@ -32,7 +32,10 @@
     "@types/nodemailer": "catalog:",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "docx": "catalog:",
+    "pdf-lib": "catalog:",
     "tailwindcss": "4.3.3",
-    "typescript": "6.0.3"
+    "tsx": "catalog:",
+    "typescript": "5.9.3"
   }
 }

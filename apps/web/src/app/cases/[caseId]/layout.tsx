@@ -66,6 +66,16 @@ export default async function CaseLayout({
             <SignOutButton />
           </div>
         </header>
+        {session.user.email.endsWith(".demo@resurgo.local") && (
+          <aside className="synthetic-demo-banner" role="note">
+            <strong>Fictional demonstration data</strong>
+            <span>
+              This workspace contains synthetic people, organizations, facts,
+              and documents. It is not a real client record.
+            </span>
+            <Link href={`/cases/${caseId}/demo`}>Open guided demo</Link>
+          </aside>
+        )}
         {children}
       </div>
     </div>

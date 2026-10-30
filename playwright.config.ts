@@ -2,7 +2,11 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  fullyParallel: true,
+  // Browser journeys share the local database, Mailpit inbox, auth rate-limit
+  // store, and one document worker. Serialize them so the suite validates real
+  // workflows without introducing cross-test infrastructure races.
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : "list",
@@ -19,7 +23,7 @@ export default defineConfig({
   ],
   webServer: {
     command:
-      "NEXT_PUBLIC_APP_URL=http://127.0.0.1:3100 pnpm --filter @resurgo/web exec next start --hostname 127.0.0.1 --port 3100",
+      "NODE_ENV=production NEXT_PUBLIC_APP_URL=http://127.0.0.1:3100 pnpm --filter @resurgo/web exec next start --hostname 127.0.0.1 --port 3100",
     reuseExistingServer: false,
     timeout: 120_000,
     url: "http://127.0.0.1:3100",

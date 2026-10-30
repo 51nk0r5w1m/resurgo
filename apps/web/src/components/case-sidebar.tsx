@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  BookOpenCheck,
   Compass,
   FileText,
   LayoutDashboard,
@@ -14,6 +15,7 @@ import { usePathname } from "next/navigation";
 
 const items = [
   { href: "", icon: LayoutDashboard, label: "Overview" },
+  { href: "/demo", icon: BookOpenCheck, label: "Demo guide" },
   { href: "/discovery", icon: Compass, label: "Discovery" },
   { href: "/roadmap", icon: Map, label: "Roadmap" },
   { href: "/documents", icon: FileText, label: "Documents" },

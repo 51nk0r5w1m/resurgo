@@ -23,14 +23,18 @@ PostgreSQL, Garage, ClamAV, and the document worker.
   structured values, document references, and applicable-question progress.
 - Deterministic professional recommendations, document requests, review triggers,
   and explainable roadmap items, validated across five distinct synthetic cases.
+- Three-account client, attorney, and mortgage-specialist collaboration using
+  accepted invitations, purpose-specific consent, exact document grants,
+  evidence-linked settlement feasibility findings, attorney acknowledgement,
+  and immediate revocation denial.
+- Deterministic fictional Atlanta homeowner demonstration with six valid PDF and
+  DOCX files processed through private quarantine, ClamAV, structural validation,
+  immutable versioning, and the real document worker.
+- Guided client demonstration, populated professional workspaces, and desktop and
+  mobile browser evidence for the settlement-deadline coordination story.
 
 ## Backend only
 
-- Verified-pilot professional invitation, explicit acceptance, granular document
-  disclosure/revocation, review assignment, immutable review revisions,
-  evidence-linked findings, and attorney acknowledgement are implemented in the
-  case workspace. The complete multi-user professional journey still requires a
-  dedicated Playwright fixture and is not yet browser-tested.
 - Document requests are persisted and actionable, but notification delivery is
   not implemented.
 

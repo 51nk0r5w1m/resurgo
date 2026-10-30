@@ -363,7 +363,7 @@ test("client registers, verifies, creates a private case, and builds a roadmap",
 
   await page.goto("/dashboard");
   await expect(
-    page.getByRole("link", { name: "Continue guided discovery" }),
+    page.getByRole("link", { name: "Open populated case workspace" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login$/u);
