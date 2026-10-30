@@ -394,11 +394,12 @@ describe.skipIf(!databaseUrl)("Better Auth security boundary", () => {
       }),
       caseId,
     );
+    const absentCaseId = randomUUID();
     const absentRead = await caseApi.read(
-      new Request(`${appUrl}/api/cases/${randomUUID()}`, {
+      new Request(`${appUrl}/api/cases/${absentCaseId}`, {
         headers: { cookie: unrelatedCookie },
       }),
-      randomUUID(),
+      absentCaseId,
     );
     expect(unrelatedRead.status).toBe(404);
     expect(absentRead.status).toBe(404);
