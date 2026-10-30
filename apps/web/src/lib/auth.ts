@@ -4,7 +4,7 @@ import { parseEnvironment } from "@resurgo/config";
 import { createDatabase } from "@resurgo/db";
 
 import { createResurgoAuth } from "./auth-factory";
-import { recordAuthEvent } from "./auth-audit";
+import { classifyAuthenticationResponse, recordAuthEvent } from "./auth-audit";
 import { createSmtpEmailSender } from "./email";
 
 let runtime:
@@ -56,9 +56,9 @@ export async function auditAuthenticationResponse(
   const action = actionByPath[path];
   if (!action) return;
 
+  const result = await classifyAuthenticationResponse(response);
   await recordAuthEvent(getRuntime().database.db, {
     action,
-    outcome: response.ok ? "success" : "denied",
-    ...(response.ok ? {} : { reasonCode: `http_${response.status}` }),
+    ...result,
   });
 }
