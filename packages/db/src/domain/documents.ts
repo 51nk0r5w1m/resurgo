@@ -211,6 +211,24 @@ export async function recordDocumentProcessingEvent(
     if (!validTransition) {
       throw new Error("Invalid document processing status transition");
     }
+    const [latestEvent] = await transaction
+      .select({ status: documentProcessingEvents.status })
+      .from(documentProcessingEvents)
+      .where(
+        and(
+          eq(documentProcessingEvents.caseId, input.caseId),
+          eq(documentProcessingEvents.documentId, input.documentId),
+          eq(documentProcessingEvents.documentVersionId, input.versionId),
+        ),
+      )
+      .orderBy(desc(documentProcessingEvents.createdAt))
+      .limit(1);
+    if (
+      latestEvent?.status === "available" ||
+      (latestEvent?.status === "rejected" && input.status === "quarantined")
+    ) {
+      throw new Error("Invalid document processing status transition");
+    }
     const [event] = await transaction
       .insert(documentProcessingEvents)
       .values({
