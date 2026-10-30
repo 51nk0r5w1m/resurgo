@@ -25,14 +25,16 @@ Discovery to Documents: identity, case creation, guided intake, deterministic se
 - v0.5: Docassemble/Suffolk Assembly Line and jurisdiction-specific document packages
 - Later: authorized court filing adapters and regulated provider integrations
 
-## Checkpoint B1 foundation
+## Current foundation through Checkpoint C2
 
 The repository is a pnpm modular monolith with a Next.js App Router application,
 shared configuration/UI/database packages, PostgreSQL with Drizzle migrations,
-and private Garage object storage for local development. Phase B1 adds the
-Better Auth-compatible identity schema and separate organization, case,
-classified-resource, consent/grant, and audit boundaries. Authentication and
-document handling are deliberately not implemented yet.
+and private Garage object storage for local development. Better Auth identity,
+case authorization, guided discovery, immutable document metadata, bounded
+quarantine uploads, ClamAV scanning, structural PDF/DOCX validation, and an
+isolated PDF-preview worker are implemented. Cross-professional document access
+still requires explicit consent and a document grant; C3 collaboration and
+professional-review interfaces remain in progress.
 
 ### Prerequisites
 
@@ -47,8 +49,8 @@ npm install --global pnpm@12.16.1
 pnpm install --frozen-lockfile
 ```
 
-Create random local-only credentials, start PostgreSQL and Garage, and apply the
-initial migration:
+Create random local-only credentials, start PostgreSQL, Garage, Mailpit, ClamAV,
+and the document worker, then apply the migrations:
 
 ```bash
 pnpm setup:local
@@ -61,9 +63,10 @@ pnpm dev
 ```
 
 Generated `.env` and `.secrets/` files are ignored by Git. The committed
-`.env.example` contains placeholders only. PostgreSQL and Garage publish ports on
-loopback; Garage has no anonymous/public bucket policy or exposed administration
-port.
+`.env.example` contains placeholders only. Published development ports are
+loopback-only; Garage has no anonymous/public bucket policy or exposed
+administration port. The worker has no inbound port or authentication/session
+secret.
 
 ### Quality gates
 

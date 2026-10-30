@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { formatEnvironmentError, parseEnvironment } from "./environment";
+import {
+  formatEnvironmentError,
+  parseDocumentWorkerEnvironment,
+  parseEnvironment,
+} from "./environment";
 
 const validEnvironment = {
   BETTER_AUTH_SECRET:
@@ -25,6 +29,22 @@ const validEnvironment = {
 describe("environment validation", () => {
   it("accepts a complete synthetic local configuration", () => {
     expect(parseEnvironment(validEnvironment).POSTGRES_DB).toBe("resurgo");
+  });
+
+  it("starts the document worker without authentication or mail secrets", () => {
+    const workerEnvironment = {
+      DATABASE_URL: validEnvironment.DATABASE_URL,
+      GARAGE_ACCESS_KEY_ID: validEnvironment.GARAGE_ACCESS_KEY_ID,
+      GARAGE_BUCKET: validEnvironment.GARAGE_BUCKET,
+      GARAGE_ENDPOINT: validEnvironment.GARAGE_ENDPOINT,
+      GARAGE_REGION: validEnvironment.GARAGE_REGION,
+      GARAGE_SECRET_ACCESS_KEY: validEnvironment.GARAGE_SECRET_ACCESS_KEY,
+      NODE_ENV: validEnvironment.NODE_ENV,
+    };
+
+    expect(parseDocumentWorkerEnvironment(workerEnvironment).DATABASE_URL).toBe(
+      validEnvironment.DATABASE_URL,
+    );
   });
 
   it("rejects placeholder secrets without echoing their values", () => {

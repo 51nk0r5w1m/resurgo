@@ -48,6 +48,8 @@ export const caseRole = resurgoSchema.enum("case_role", [
 
 export const resourceType = resurgoSchema.enum("resource_type", [
   "document",
+  "document_request",
+  "professional_review",
   "intake_response",
   "roadmap_item",
   "coordination_note",
@@ -62,6 +64,7 @@ export const resourceOperation = resurgoSchema.enum("resource_operation", [
   "view",
   "download",
   "share",
+  "contribute",
 ]);
 
 export const consentStatus = resurgoSchema.enum("consent_status", [
@@ -112,3 +115,91 @@ export const roadmapStatus = resurgoSchema.enum("roadmap_status", [
   "ready",
   "completed",
 ]);
+
+export const documentFormat = resurgoSchema.enum("document_format", [
+  "pdf",
+  "docx",
+]);
+
+export const documentConfidentiality = resurgoSchema.enum(
+  "document_confidentiality",
+  [
+    "standard",
+    "confidential",
+    "attorney_client",
+    "financial_restricted",
+    "personal_sensitive",
+  ],
+);
+
+export const documentSource = resurgoSchema.enum("document_source", [
+  "client_upload",
+  "professional_upload",
+  "generated",
+  "imported",
+]);
+
+export const documentContributorRole = resurgoSchema.enum(
+  "document_contributor_role",
+  ["owner", "uploader", "version_author"],
+);
+
+export const documentContributorStatus = resurgoSchema.enum(
+  "document_contributor_status",
+  ["active", "revoked"],
+);
+
+export const documentProcessingStatus = resurgoSchema.enum(
+  "document_processing_status",
+  ["quarantined", "processing", "available", "rejected", "superseded"],
+);
+
+export const legalHoldAction = resurgoSchema.enum("legal_hold_action", [
+  "placed",
+  "released",
+]);
+
+export const documentRequestStatus = resurgoSchema.enum(
+  "document_request_status",
+  ["requested", "submitted", "completed", "cancelled"],
+);
+
+export const professionalReviewSubject = resurgoSchema.enum(
+  "professional_review_subject",
+  [
+    "document_set",
+    "mortgage_property",
+    "financial_position",
+    "legal_strategy",
+    "case_coordination",
+    "other",
+  ],
+);
+
+export const professionalReviewStatus = resurgoSchema.enum(
+  "professional_review_status",
+  [
+    "assigned",
+    "in_progress",
+    "clarification_required",
+    "completed",
+    "withdrawn",
+    "superseded",
+  ],
+);
+
+export const reviewStatementType = resurgoSchema.enum("review_statement_type", [
+  "finding",
+  "outstanding_condition",
+  "clarification_request",
+]);
+
+export const reviewConditionStatus = resurgoSchema.enum(
+  "review_condition_status",
+  ["open", "satisfied", "waived", "not_applicable"],
+);
+
+export const reviewAcknowledgementAction = resurgoSchema.enum(
+  "review_acknowledgement_action",
+  ["acknowledged", "withdrawn"],
+);

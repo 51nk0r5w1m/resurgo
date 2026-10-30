@@ -10,8 +10,10 @@
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "catalog:",
+    "@fastify/busboy": "catalog:",
     "@resurgo/config": "workspace:*",
     "@resurgo/db": "catalog:",
+    "@resurgo/documents": "catalog:",
     "@resurgo/ui": "workspace:*",
     "better-auth": "catalog:",
     "lucide-react": "1.64.0",

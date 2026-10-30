@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
+import { PDFDocument } from "pdf-lib";
 
 async function verificationUrl(
   request: APIRequestContext,
@@ -102,6 +103,61 @@ test("client registers, verifies, creates a private case, and builds a roadmap",
   ).toBeVisible();
   await expect(
     page.getByText(/not legal advice, a mortgage eligibility decision/u),
+  ).toBeVisible();
+
+  await page.getByRole("link", { name: "Documents" }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Documents stay within their boundaries.",
+    }),
+  ).toBeVisible();
+  const syntheticPdf = await PDFDocument.create();
+  syntheticPdf.addPage([612, 792]);
+  const uploadRegion = page.getByRole("region", { name: "Upload document" });
+  await uploadRegion
+    .getByLabel("Document title")
+    .fill("Synthetic mortgage statement");
+  await uploadRegion.getByLabel("Information domain").selectOption("financial");
+  await page.getByLabel("Confidentiality").selectOption("financial_restricted");
+  await page.getByLabel("PDF or DOCX file").setInputFiles({
+    buffer: Buffer.from(await syntheticPdf.save()),
+    mimeType: "application/pdf",
+    name: "synthetic-mortgage-statement.pdf",
+  });
+  await uploadRegion.getByRole("button", { name: "Upload securely" }).click();
+  await expect(uploadRegion.getByRole("status")).toContainText(
+    "It remains unavailable while validation and malware scanning run.",
+  );
+  await expect(
+    page.getByRole("heading", { name: "Synthetic mortgage statement" }),
+  ).toBeVisible();
+  const processingStatus = page.locator(".document-status");
+  await expect(processingStatus).toHaveText(
+    /^(quarantined|processing|available)$/u,
+  );
+  if ((await processingStatus.textContent()) === "available") {
+    await expect(page.getByRole("link", { name: "Preview" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Download" })).toBeVisible();
+  } else {
+    await expect(page.getByRole("link", { name: "Preview" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Download" })).toHaveCount(0);
+  }
+  await page
+    .getByLabel("Request title")
+    .fill("Synthetic property appraisal request");
+  await page
+    .getByRole("region", { name: "Document requests" })
+    .getByLabel("Information domain")
+    .selectOption("financial");
+  await page
+    .getByLabel("What is needed?")
+    .fill("Provide a synthetic appraisal for professional review.");
+  await page.getByRole("button", { name: "Add document request" }).click();
+  await expect(page.getByRole("status").last()).toContainText(
+    "Document request added",
+  );
+  await expect(
+    page.getByRole("heading", { name: "Synthetic property appraisal request" }),
   ).toBeVisible();
 
   await page.goto("/dashboard");

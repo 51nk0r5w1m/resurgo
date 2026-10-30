@@ -14,6 +14,20 @@ import {
 } from "./domain/authorization";
 import { createCaseWithOwner } from "./domain/cases";
 import {
+  createDocumentRequest,
+  listAuthorizedDocumentRequests,
+  transitionDocumentRequest,
+} from "./domain/document-requests";
+import {
+  addDocumentVersion,
+  createDocumentWithVersion,
+  getAuthorizedAvailableDocumentVersion,
+  grantDocumentAccess,
+  listAuthorizedDocuments,
+  recordDocumentLegalHold,
+  recordDocumentProcessingEvent,
+} from "./domain/documents";
+import {
   grantCaseMembership,
   revokeCaseMembership,
 } from "./domain/memberships";
@@ -22,6 +36,14 @@ import {
   getDiscoveryState,
   saveDiscoveryAnswer,
 } from "./domain/discovery";
+import {
+  appendProfessionalReviewRevision,
+  computeProfessionalReviewStatementHash,
+  createProfessionalReview,
+  grantProfessionalReviewAccess,
+  listAuthorizedProfessionalReviews,
+  recordAttorneyReviewAcknowledgement,
+} from "./domain/reviews";
 import * as schema from "./schema";
 
 const { Client, Pool } = pg;
@@ -808,6 +830,911 @@ describe("case and professional security boundaries", () => {
   });
 });
 
+describe("immutable document and professional review foundations", () => {
+  test("enforces consent-scoped document requests and immutable request history", async () => {
+    const owner = await createSyntheticUser("request-owner");
+    const professional = await createSyntheticUser("request-professional");
+    const unrelated = await createSyntheticUser("request-unrelated");
+    const { case: clientCase, ownerMembership } = await createCaseWithOwner(
+      database,
+      { jurisdictionCode: "GA-FULTON-SUPERIOR", ownerUserId: owner.id },
+    );
+    const organization = await createVerifiedOrganization(
+      "Synthetic Request Mortgage Pilot",
+      "lender",
+      owner.id,
+    );
+    const affiliation = await createProfessionalMembership(
+      professional.id,
+      organization.id,
+    );
+    const [professionalMembership] = await database
+      .insert(schema.caseMemberships)
+      .values({
+        caseId: clientCase.id,
+        organizationMembershipId: affiliation.id,
+        role: "lender",
+        status: "active",
+        userId: professional.id,
+        validFrom: new Date(),
+      })
+      .returning();
+    if (!professionalMembership) throw new Error("Membership was not created");
+    const consents = await database
+      .insert(schema.disclosureConsents)
+      .values(
+        (["view", "contribute"] as const).map((operation) => ({
+          caseId: clientCase.id,
+          classification: "financial" as const,
+          grantorCaseMembershipId: ownerMembership.id,
+          operation,
+          purpose: "Synthetic document request coordination",
+          recipientCaseMembershipId: professionalMembership.id,
+          termsHash: operation === "view" ? "7".repeat(64) : "8".repeat(64),
+        })),
+      )
+      .returning();
+    const viewConsent = consents.find(({ operation }) => operation === "view");
+    const contributeConsent = consents.find(
+      ({ operation }) => operation === "contribute",
+    );
+    if (!viewConsent || !contributeConsent) throw new Error("Consents missing");
+
+    const request = await createDocumentRequest(database, {
+      assignedToCaseMembershipId: professionalMembership.id,
+      assigneeConsentIds: {
+        contribute: contributeConsent.id,
+        view: viewConsent.id,
+      },
+      caseId: clientCase.id,
+      classification: "financial",
+      description: "Provide the synthetic payoff statement for review.",
+      title: "Synthetic payoff statement",
+      userId: owner.id,
+    });
+    await expect(
+      listAuthorizedDocumentRequests(database, {
+        caseId: clientCase.id,
+        userId: professional.id,
+      }),
+    ).resolves.toHaveLength(1);
+    await expect(
+      transitionDocumentRequest(database, {
+        caseId: clientCase.id,
+        documentRequestId: request.id,
+        status: "cancelled",
+        userId: professional.id,
+      }),
+    ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
+    await database
+      .update(schema.disclosureConsents)
+      .set({ revokedAt: new Date(), status: "revoked" })
+      .where(eq(schema.disclosureConsents.id, viewConsent.id));
+    await expect(
+      listAuthorizedDocumentRequests(database, {
+        caseId: clientCase.id,
+        userId: professional.id,
+      }),
+    ).resolves.toEqual([]);
+    await database
+      .update(schema.disclosureConsents)
+      .set({ revokedAt: new Date(), status: "revoked" })
+      .where(eq(schema.disclosureConsents.id, contributeConsent.id));
+    await expect(
+      transitionDocumentRequest(database, {
+        caseId: clientCase.id,
+        documentRequestId: request.id,
+        status: "cancelled",
+        userId: professional.id,
+      }),
+    ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
+    await expect(
+      listAuthorizedDocumentRequests(database, {
+        caseId: clientCase.id,
+        userId: unrelated.id,
+      }),
+    ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
+    const [event] = await database
+      .select({ id: schema.documentRequestEvents.id })
+      .from(schema.documentRequestEvents)
+      .where(eq(schema.documentRequestEvents.documentRequestId, request.id))
+      .limit(1);
+    await expectDatabaseError(
+      database
+        .update(schema.documentRequestEvents)
+        .set({ status: "cancelled" })
+        .where(eq(schema.documentRequestEvents.id, event!.id)),
+      "55000",
+    );
+  });
+
+  test("tracks an exact available version through request submission and completion", async () => {
+    const owner = await createSyntheticUser("request-lifecycle-owner");
+    const { case: clientCase } = await createCaseWithOwner(database, {
+      jurisdictionCode: "GA-DEKALB-SUPERIOR",
+      ownerUserId: owner.id,
+    });
+    const request = await createDocumentRequest(database, {
+      caseId: clientCase.id,
+      classification: "legal",
+      description: "Upload the synthetic court filing for the case record.",
+      title: "Synthetic filed petition",
+      userId: owner.id,
+    });
+    const document = await createDocumentWithVersion(database, {
+      byteSize: 640,
+      caseId: clientCase.id,
+      classification: "legal",
+      confidentiality: "confidential",
+      contentHash: "9".repeat(64),
+      format: "pdf",
+      mimeType: "application/pdf",
+      retentionClass: "synthetic_request_record",
+      source: "client_upload",
+      title: "Synthetic filed petition",
+      userId: owner.id,
+    });
+    await database.insert(schema.documentProcessingEvents).values({
+      caseId: clientCase.id,
+      documentId: document.document.id,
+      documentVersionId: document.version.id,
+      status: "available",
+    });
+    const wrongDomainDocument = await createDocumentWithVersion(database, {
+      byteSize: 650,
+      caseId: clientCase.id,
+      classification: "financial",
+      confidentiality: "financial_restricted",
+      contentHash: "0".repeat(64),
+      format: "pdf",
+      mimeType: "application/pdf",
+      retentionClass: "synthetic_request_record",
+      source: "client_upload",
+      title: "Synthetic financial record",
+      userId: owner.id,
+    });
+    await database.insert(schema.documentProcessingEvents).values({
+      caseId: clientCase.id,
+      documentId: wrongDomainDocument.document.id,
+      documentVersionId: wrongDomainDocument.version.id,
+      status: "available",
+    });
+    await expect(
+      transitionDocumentRequest(database, {
+        caseId: clientCase.id,
+        documentId: wrongDomainDocument.document.id,
+        documentRequestId: request.id,
+        documentVersionId: wrongDomainDocument.version.id,
+        status: "submitted",
+        userId: owner.id,
+      }),
+    ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
+    await transitionDocumentRequest(database, {
+      caseId: clientCase.id,
+      documentId: document.document.id,
+      documentRequestId: request.id,
+      documentVersionId: document.version.id,
+      status: "submitted",
+      userId: owner.id,
+    });
+    await transitionDocumentRequest(database, {
+      caseId: clientCase.id,
+      documentId: document.document.id,
+      documentRequestId: request.id,
+      documentVersionId: document.version.id,
+      status: "completed",
+      userId: owner.id,
+    });
+    await expect(
+      listAuthorizedDocumentRequests(database, {
+        caseId: clientCase.id,
+        userId: owner.id,
+      }),
+    ).resolves.toMatchObject([
+      {
+        document_id: document.document.id,
+        document_version_id: document.version.id,
+        status: "completed",
+      },
+    ]);
+  });
+
+  test("records clarification, specialist findings, and consent-bound attorney acknowledgement", async () => {
+    const owner = await createSyntheticUser("review-register-owner");
+    const specialist = await createSyntheticUser("review-register-lender");
+    const attorney = await createSyntheticUser("review-register-attorney");
+    const { case: clientCase, ownerMembership } = await createCaseWithOwner(
+      database,
+      { jurisdictionCode: "GA-FULTON-SUPERIOR", ownerUserId: owner.id },
+    );
+    const lenderOrganization = await createVerifiedOrganization(
+      "Synthetic Review Lender",
+      "lender",
+      owner.id,
+    );
+    const lawFirm = await createVerifiedOrganization(
+      "Synthetic Review Law Firm",
+      "law_firm",
+      owner.id,
+    );
+    const lenderAffiliation = await createProfessionalMembership(
+      specialist.id,
+      lenderOrganization.id,
+    );
+    const attorneyAffiliation = await createProfessionalMembership(
+      attorney.id,
+      lawFirm.id,
+    );
+    const memberships = await database
+      .insert(schema.caseMemberships)
+      .values([
+        {
+          caseId: clientCase.id,
+          organizationMembershipId: lenderAffiliation.id,
+          role: "lender" as const,
+          status: "active" as const,
+          userId: specialist.id,
+          validFrom: new Date(),
+        },
+        {
+          caseId: clientCase.id,
+          organizationMembershipId: attorneyAffiliation.id,
+          role: "attorney" as const,
+          status: "active" as const,
+          userId: attorney.id,
+          validFrom: new Date(),
+        },
+      ])
+      .returning();
+    const lenderMembership = memberships.find(({ role }) => role === "lender");
+    const attorneyMembership = memberships.find(
+      ({ role }) => role === "attorney",
+    );
+    if (!lenderMembership || !attorneyMembership) {
+      throw new Error("Professional memberships were not created");
+    }
+    const document = await createDocumentWithVersion(database, {
+      byteSize: 840,
+      caseId: clientCase.id,
+      classification: "financial",
+      confidentiality: "financial_restricted",
+      contentHash: "b".repeat(64),
+      format: "pdf",
+      mimeType: "application/pdf",
+      retentionClass: "synthetic_review_record",
+      source: "client_upload",
+      title: "Synthetic mortgage statement",
+      userId: owner.id,
+    });
+    await database.insert(schema.documentProcessingEvents).values({
+      caseId: clientCase.id,
+      documentId: document.document.id,
+      documentVersionId: document.version.id,
+      status: "available",
+    });
+    const consentExpiry = new Date(Date.now() + 60 * 60 * 1000);
+    const lenderConsents = await database
+      .insert(schema.disclosureConsents)
+      .values(
+        (["view", "contribute"] as const).map((operation) => ({
+          caseId: clientCase.id,
+          classification: "financial" as const,
+          expiresAt: consentExpiry,
+          grantorCaseMembershipId: ownerMembership.id,
+          operation,
+          purpose: "Synthetic mortgage specialist review",
+          recipientCaseMembershipId: lenderMembership.id,
+          termsHash: operation === "view" ? "c".repeat(64) : "d".repeat(64),
+        })),
+      )
+      .returning();
+    const lenderView = lenderConsents.find(
+      ({ operation }) => operation === "view",
+    );
+    const lenderContribute = lenderConsents.find(
+      ({ operation }) => operation === "contribute",
+    );
+    if (!lenderView || !lenderContribute) throw new Error("Consents missing");
+    const documentGrants = await grantDocumentAccess(database, {
+      caseId: clientCase.id,
+      documentId: document.document.id,
+      granteeCaseMembershipId: lenderMembership.id,
+      grants: [
+        { operation: "view", sourceConsentId: lenderView.id },
+        { operation: "contribute", sourceConsentId: lenderContribute.id },
+      ],
+      userId: owner.id,
+    });
+    expect(documentGrants).toHaveLength(2);
+    expect(
+      documentGrants.every(
+        ({ expiresAt }) => expiresAt?.getTime() === consentExpiry.getTime(),
+      ),
+    ).toBe(true);
+    const review = await createProfessionalReview(database, {
+      caseId: clientCase.id,
+      classification: "financial",
+      decisionContext: "Coordinate the synthetic mortgage transition.",
+      evidence: [
+        {
+          documentId: document.document.id,
+          documentVersionId: document.version.id,
+          purpose: "Review the synthetic balance and payment record.",
+        },
+      ],
+      responsibleCaseMembershipId: lenderMembership.id,
+      responsibleGrantConsents: {
+        contributeConsentId: lenderContribute.id,
+        viewConsentId: lenderView.id,
+      },
+      reviewScope: "Identify factual mortgage conditions for attorney review.",
+      subjectType: "mortgage_property",
+      userId: owner.id,
+    });
+    const concurrentAppends = await Promise.allSettled(
+      [1, 2].map(() =>
+        appendProfessionalReviewRevision(database, {
+          caseId: clientCase.id,
+          decisionContext: "Synthetic specialist review is underway.",
+          evidence: [
+            {
+              documentId: document.document.id,
+              documentVersionId: document.version.id,
+              purpose: "Current synthetic evidence under review.",
+            },
+          ],
+          professionalReviewId: review.review.id,
+          reviewScope: "Review factual mortgage information.",
+          status: "in_progress",
+          userId: specialist.id,
+        }),
+      ),
+    );
+    expect(
+      concurrentAppends.filter(({ status }) => status === "fulfilled"),
+    ).toHaveLength(1);
+    expect(
+      concurrentAppends.filter(({ status }) => status === "rejected"),
+    ).toHaveLength(1);
+    await appendProfessionalReviewRevision(database, {
+      caseId: clientCase.id,
+      decisionContext: "Additional synthetic payoff evidence is required.",
+      evidence: [
+        {
+          documentId: document.document.id,
+          documentVersionId: document.version.id,
+          purpose: "Current synthetic evidence under review.",
+        },
+      ],
+      professionalReviewId: review.review.id,
+      reviewScope: "Clarify the current synthetic payoff amount.",
+      statements: [
+        {
+          body: "Please provide a current synthetic payoff statement.",
+          type: "clarification_request",
+        },
+      ],
+      status: "clarification_required",
+      userId: specialist.id,
+    });
+    const completed = await appendProfessionalReviewRevision(database, {
+      caseId: clientCase.id,
+      decisionContext: "Synthetic specialist review completed.",
+      evidence: [
+        {
+          documentId: document.document.id,
+          documentVersionId: document.version.id,
+          purpose: "Evidence supporting the synthetic factual finding.",
+        },
+      ],
+      professionalReviewId: review.review.id,
+      reviewScope: "Record factual findings without an eligibility decision.",
+      statements: [
+        {
+          body: "Qualified professional review remains required for any decision.",
+          type: "finding",
+        },
+      ],
+      status: "completed",
+      userId: specialist.id,
+    });
+    await expect(
+      appendProfessionalReviewRevision(database, {
+        caseId: clientCase.id,
+        decisionContext: "Duplicate evidence must be rejected.",
+        evidence: [
+          {
+            documentId: document.document.id,
+            documentVersionId: document.version.id,
+            purpose: "First reference.",
+          },
+          {
+            documentId: document.document.id,
+            documentVersionId: document.version.id,
+            purpose: "Conflicting duplicate reference.",
+          },
+        ],
+        professionalReviewId: review.review.id,
+        reviewScope: "This invalid revision must not be stored.",
+        status: "superseded",
+        userId: specialist.id,
+      }),
+    ).rejects.toThrow("Duplicate professional review evidence reference");
+    const [attorneyConsent] = await database
+      .insert(schema.disclosureConsents)
+      .values({
+        caseId: clientCase.id,
+        classification: "financial",
+        grantorCaseMembershipId: ownerMembership.id,
+        operation: "view",
+        purpose: "Attorney acknowledgement of specialist findings",
+        recipientCaseMembershipId: attorneyMembership.id,
+        termsHash: "e".repeat(64),
+      })
+      .returning();
+    if (!attorneyConsent) throw new Error("Attorney consent missing");
+    await grantProfessionalReviewAccess(database, {
+      caseId: clientCase.id,
+      consentId: attorneyConsent.id,
+      granteeCaseMembershipId: attorneyMembership.id,
+      operation: "view",
+      professionalReviewId: review.review.id,
+      userId: owner.id,
+    });
+    await expect(
+      recordAttorneyReviewAcknowledgement(database, {
+        action: "acknowledged",
+        caseId: clientCase.id,
+        professionalReviewId: review.review.id,
+        reviewRevisionId: completed.id,
+        statementHash: "f".repeat(64),
+        userId: attorney.id,
+      }),
+    ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
+    await recordAttorneyReviewAcknowledgement(database, {
+      action: "acknowledged",
+      caseId: clientCase.id,
+      professionalReviewId: review.review.id,
+      reviewRevisionId: completed.id,
+      statementHash: computeProfessionalReviewStatementHash({
+        decisionContext: "Synthetic specialist review completed.",
+        reviewScope: "Record factual findings without an eligibility decision.",
+        statements: [
+          {
+            body: "Qualified professional review remains required for any decision.",
+            type: "finding",
+          },
+        ],
+      }),
+      userId: attorney.id,
+    });
+    await expectDatabaseError(
+      database.insert(schema.professionalReviewRevisions).values({
+        caseId: clientCase.id,
+        createdByCaseMembershipId: ownerMembership.id,
+        decisionContext: "Synthetic invalid lineage",
+        professionalReviewId: review.review.id,
+        reviewScope: "This revision skips its immediate predecessor.",
+        revision: 99,
+        status: "superseded",
+        supersedesRevisionId: completed.id,
+      }),
+      "23514",
+    );
+    await expectDatabaseError(
+      database.insert(schema.professionalReviewRevisions).values({
+        caseId: clientCase.id,
+        createdByCaseMembershipId: ownerMembership.id,
+        decisionContext: "Synthetic competing root",
+        professionalReviewId: review.review.id,
+        reviewScope: "A second root must not be accepted.",
+        revision: 1,
+        status: "assigned",
+      }),
+      "23505",
+    );
+    await expectDatabaseError(
+      database.insert(schema.professionalReviewAcknowledgements).values({
+        action: "acknowledged",
+        attorneyCaseMembershipId: ownerMembership.id,
+        caseId: clientCase.id,
+        professionalReviewId: review.review.id,
+        reviewRevisionId: completed.id,
+        statementHash: "a".repeat(64),
+      }),
+      "23514",
+    );
+    await expect(
+      listAuthorizedProfessionalReviews(database, {
+        caseId: clientCase.id,
+        userId: attorney.id,
+      }),
+    ).resolves.toMatchObject([
+      {
+        evidence: [],
+        professionalReviewId: review.review.id,
+        status: "completed",
+      },
+    ]);
+    await database
+      .update(schema.disclosureConsents)
+      .set({ revokedAt: new Date(), status: "revoked" })
+      .where(eq(schema.disclosureConsents.id, attorneyConsent.id));
+    await expect(
+      listAuthorizedProfessionalReviews(database, {
+        caseId: clientCase.id,
+        userId: attorney.id,
+      }),
+    ).resolves.toEqual([]);
+    expect(
+      await database
+        .select()
+        .from(schema.professionalReviewAcknowledgements)
+        .where(
+          eq(
+            schema.professionalReviewAcknowledgements.reviewRevisionId,
+            completed.id,
+          ),
+        ),
+    ).toHaveLength(1);
+  });
+
+  test("never exposes quarantined versions or cross-case document metadata", async () => {
+    const owner = await createSyntheticUser("document-boundary-owner");
+    const unrelated = await createSyntheticUser("document-boundary-unrelated");
+    const { case: clientCase } = await createCaseWithOwner(database, {
+      jurisdictionCode: "GA-FULTON-SUPERIOR",
+      ownerUserId: owner.id,
+    });
+    const created = await createDocumentWithVersion(database, {
+      byteSize: 512,
+      caseId: clientCase.id,
+      classification: "financial",
+      confidentiality: "financial_restricted",
+      contentHash: "6".repeat(64),
+      format: "pdf",
+      mimeType: "application/pdf",
+      retentionClass: "synthetic_pilot_record",
+      source: "client_upload",
+      title: "Synthetic property transition statement",
+      userId: owner.id,
+    });
+
+    await expect(
+      getAuthorizedAvailableDocumentVersion(database, {
+        caseId: clientCase.id,
+        documentId: created.document.id,
+        operation: "view",
+        userId: owner.id,
+        versionId: created.version.id,
+      }),
+    ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
+
+    await database.insert(schema.documentProcessingEvents).values({
+      caseId: clientCase.id,
+      documentId: created.document.id,
+      documentVersionId: created.version.id,
+      status: "available",
+    });
+    await expect(
+      getAuthorizedAvailableDocumentVersion(database, {
+        caseId: clientCase.id,
+        documentId: created.document.id,
+        operation: "view",
+        userId: owner.id,
+        versionId: created.version.id,
+      }),
+    ).resolves.toMatchObject({
+      documentId: created.document.id,
+      versionId: created.version.id,
+    });
+    await expect(
+      listAuthorizedDocuments(database, {
+        caseId: clientCase.id,
+        userId: unrelated.id,
+      }),
+    ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
+    await expect(
+      getAuthorizedAvailableDocumentVersion(database, {
+        caseId: clientCase.id,
+        documentId: created.document.id,
+        operation: "download",
+        userId: unrelated.id,
+        versionId: created.version.id,
+      }),
+    ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
+  });
+
+  test("rejects terminal processing regressions and serializes legal holds", async () => {
+    const owner = await createSyntheticUser("document-lifecycle-owner");
+    const { case: clientCase } = await createCaseWithOwner(database, {
+      jurisdictionCode: "GA-FULTON-SUPERIOR",
+      ownerUserId: owner.id,
+    });
+    const created = await createDocumentWithVersion(database, {
+      byteSize: 256,
+      caseId: clientCase.id,
+      classification: "legal",
+      confidentiality: "confidential",
+      contentHash: "9".repeat(64),
+      format: "pdf",
+      mimeType: "application/pdf",
+      retentionClass: "synthetic_lifecycle_record",
+      source: "client_upload",
+      title: "Synthetic lifecycle document",
+      userId: owner.id,
+    });
+
+    await database.insert(schema.documentProcessingEvents).values({
+      caseId: clientCase.id,
+      documentId: created.document.id,
+      documentVersionId: created.version.id,
+      status: "available",
+    });
+    await expect(
+      recordDocumentProcessingEvent(database, {
+        caseId: clientCase.id,
+        documentId: created.document.id,
+        failureCode: "synthetic_late_failure",
+        status: "rejected",
+        userId: owner.id,
+        versionId: created.version.id,
+      }),
+    ).rejects.toThrow("Invalid document processing status transition");
+
+    const holdResults = await Promise.allSettled([
+      recordDocumentLegalHold(database, {
+        action: "placed",
+        caseId: clientCase.id,
+        documentId: created.document.id,
+        reasonCode: "synthetic_pending_review",
+        userId: owner.id,
+      }),
+      recordDocumentLegalHold(database, {
+        action: "placed",
+        caseId: clientCase.id,
+        documentId: created.document.id,
+        reasonCode: "synthetic_pending_review",
+        userId: owner.id,
+      }),
+    ]);
+    expect(
+      holdResults.filter(({ status }) => status === "fulfilled"),
+    ).toHaveLength(1);
+    expect(
+      holdResults.filter(({ status }) => status === "rejected"),
+    ).toHaveLength(1);
+    await expect(
+      database
+        .select()
+        .from(schema.documentLegalHoldEvents)
+        .where(
+          eq(schema.documentLegalHoldEvents.documentId, created.document.id),
+        ),
+    ).resolves.toHaveLength(1);
+  });
+
+  test("preserves exact evidence and immutable history after supersession and affiliation revocation", async () => {
+    const owner = await createSyntheticUser("document-owner");
+    const specialist = await createSyntheticUser("mortgage-specialist");
+    const { case: clientCase, ownerMembership } = await createCaseWithOwner(
+      database,
+      { jurisdictionCode: "GA-FULTON-SUPERIOR", ownerUserId: owner.id },
+    );
+    const organization = await createVerifiedOrganization(
+      "Synthetic Atlanta Mortgage Pilot",
+      "lender",
+      owner.id,
+    );
+    const organizationMembership = await createProfessionalMembership(
+      specialist.id,
+      organization.id,
+    );
+    const [specialistMembership] = await database
+      .insert(schema.caseMemberships)
+      .values({
+        caseId: clientCase.id,
+        organizationMembershipId: organizationMembership.id,
+        role: "lender",
+        status: "active",
+        userId: specialist.id,
+        validFrom: new Date(),
+      })
+      .returning();
+    if (!specialistMembership) {
+      throw new Error("Specialist membership was not created");
+    }
+
+    const created = await createDocumentWithVersion(database, {
+      byteSize: 1024,
+      caseId: clientCase.id,
+      classification: "financial",
+      confidentiality: "financial_restricted",
+      contentHash: "1".repeat(64),
+      format: "pdf",
+      mimeType: "application/pdf",
+      retentionClass: "pilot_financial_record",
+      source: "client_upload",
+      sourceReference: "synthetic-mortgage-statement-v1",
+      title: "Synthetic mortgage statement",
+      userId: owner.id,
+    });
+    const nativeDocument = await createDocumentWithVersion(database, {
+      byteSize: 1536,
+      caseId: clientCase.id,
+      classification: "legal",
+      confidentiality: "attorney_client",
+      contentHash: "a".repeat(64),
+      format: "docx",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      retentionClass: "pilot_legal_draft",
+      source: "client_upload",
+      sourceReference: "synthetic-settlement-draft-v1",
+      title: "Synthetic settlement draft",
+      userId: owner.id,
+    });
+    expect(nativeDocument.document.format).toBe("docx");
+    expect(nativeDocument.version.mimeType).toContain(
+      "officedocument.wordprocessingml.document",
+    );
+
+    const consents = await database
+      .insert(schema.disclosureConsents)
+      .values(
+        (["view", "contribute"] as const).map((operation) => ({
+          caseId: clientCase.id,
+          classification: "financial" as const,
+          grantorCaseMembershipId: ownerMembership.id,
+          operation,
+          purpose: "Synthetic mortgage transition review",
+          recipientCaseMembershipId: specialistMembership.id,
+          termsHash: operation === "view" ? "2".repeat(64) : "3".repeat(64),
+        })),
+      )
+      .returning();
+    const viewConsent = consents.find(({ operation }) => operation === "view");
+    const contributeConsent = consents.find(
+      ({ operation }) => operation === "contribute",
+    );
+    if (!viewConsent || !contributeConsent) {
+      throw new Error("Review consents were not created");
+    }
+    await grantDocumentAccess(database, {
+      caseId: clientCase.id,
+      documentId: created.document.id,
+      granteeCaseMembershipId: specialistMembership.id,
+      grants: [
+        { operation: "view", sourceConsentId: viewConsent.id },
+        {
+          operation: "contribute",
+          sourceConsentId: contributeConsent.id,
+        },
+      ],
+      userId: owner.id,
+    });
+
+    const review = await createProfessionalReview(database, {
+      caseId: clientCase.id,
+      classification: "financial",
+      decisionContext: "Coordinate a synthetic property transition.",
+      evidence: [
+        {
+          documentId: created.document.id,
+          documentVersionId: created.version.id,
+          purpose: "Establish the synthetic mortgage balance.",
+        },
+      ],
+      responsibleCaseMembershipId: specialistMembership.id,
+      responsibleGrantConsents: {
+        contributeConsentId: contributeConsent.id,
+        viewConsentId: viewConsent.id,
+      },
+      reviewScope: "Review supplied records without making eligibility claims.",
+      statements: [
+        {
+          body: "Updated synthetic payoff information remains outstanding.",
+          conditionStatus: "open",
+          type: "outstanding_condition",
+        },
+      ],
+      subjectType: "mortgage_property",
+      userId: owner.id,
+    });
+    const inProgress = await appendProfessionalReviewRevision(database, {
+      caseId: clientCase.id,
+      decisionContext: "Specialist review is underway.",
+      evidence: [
+        {
+          documentId: created.document.id,
+          documentVersionId: created.version.id,
+          purpose: "Original evidence retained for this revision.",
+        },
+      ],
+      professionalReviewId: review.review.id,
+      reviewScope: "Review the supplied synthetic statement.",
+      status: "in_progress",
+      userId: specialist.id,
+    });
+    const secondVersion = await addDocumentVersion(database, {
+      byteSize: 2048,
+      caseId: clientCase.id,
+      contentHash: "4".repeat(64),
+      documentId: created.document.id,
+      format: "pdf",
+      mimeType: "application/pdf",
+      source: "client_upload",
+      sourceReference: "synthetic-mortgage-statement-v2",
+      userId: owner.id,
+    });
+    expect(secondVersion.supersedesVersionId).toBe(created.version.id);
+
+    const reviewRevisionsAfterEvidenceChange = await database
+      .select({ status: schema.professionalReviewRevisions.status })
+      .from(schema.professionalReviewRevisions)
+      .where(
+        eq(
+          schema.professionalReviewRevisions.professionalReviewId,
+          review.review.id,
+        ),
+      )
+      .orderBy(schema.professionalReviewRevisions.revision);
+    expect(
+      reviewRevisionsAfterEvidenceChange.map(({ status }) => status),
+    ).toEqual(["assigned", "in_progress", "superseded"]);
+
+    const evidence = await database
+      .select()
+      .from(schema.professionalReviewEvidence)
+      .where(
+        eq(schema.professionalReviewEvidence.reviewRevisionId, inProgress.id),
+      );
+    expect(evidence).toHaveLength(1);
+    expect(evidence[0]?.documentVersionId).toBe(created.version.id);
+
+    await expectDatabaseError(
+      database
+        .update(schema.documentVersions)
+        .set({ contentHash: "5".repeat(64) })
+        .where(eq(schema.documentVersions.id, created.version.id)),
+      "55000",
+    );
+    await expectDatabaseError(
+      database
+        .delete(schema.professionalReviewRevisions)
+        .where(eq(schema.professionalReviewRevisions.id, inProgress.id)),
+      "55000",
+    );
+
+    await database
+      .update(schema.organizationMemberships)
+      .set({ revokedAt: new Date(), status: "revoked" })
+      .where(eq(schema.organizationMemberships.id, organizationMembership.id));
+    await expect(
+      appendProfessionalReviewRevision(database, {
+        caseId: clientCase.id,
+        decisionContext: "This must be denied.",
+        evidence: [],
+        professionalReviewId: review.review.id,
+        reviewScope: "No access after affiliation revocation.",
+        status: "completed",
+        userId: specialist.id,
+      }),
+    ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
+    expect(
+      await database
+        .select()
+        .from(schema.professionalReviewRevisions)
+        .where(
+          eq(
+            schema.professionalReviewRevisions.professionalReviewId,
+            review.review.id,
+          ),
+        ),
+    ).toHaveLength(3);
+  });
+});
+
 describe("central case authorization", () => {
   test("requires MFA for verified professional case access", async () => {
     const owner = await createSyntheticUser("mfa-policy-owner");
@@ -1060,6 +1987,8 @@ describe("versioned discovery and roadmap", () => {
       ownerUserId: owner.id,
     });
     for (const [questionKey, value] of [
+      ["property_status", "jointly_owned"],
+      ["mortgage_status", "yes"],
       ["property_status", "no_real_property"],
       ["financial_complexity", "straightforward"],
       ["support_interest", "none"],

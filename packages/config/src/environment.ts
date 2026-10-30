@@ -10,6 +10,8 @@ const nonPlaceholderSecret = z
 
 export const environmentSchema = z.object({
   BETTER_AUTH_SECRET: nonPlaceholderSecret.min(32),
+  CLAMAV_HOST: z.string().min(1).default("127.0.0.1"),
+  CLAMAV_PORT: z.coerce.number().int().min(1).max(65535).default(3310),
   DATABASE_URL: z.url().startsWith("postgresql://"),
   GARAGE_ACCESS_KEY_ID: z.string().startsWith("GK").min(18),
   GARAGE_BUCKET: z.string().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/),
@@ -30,8 +32,30 @@ export const environmentSchema = z.object({
 
 export type Environment = z.infer<typeof environmentSchema>;
 
+export const documentWorkerEnvironmentSchema = environmentSchema.pick({
+  CLAMAV_HOST: true,
+  CLAMAV_PORT: true,
+  DATABASE_URL: true,
+  GARAGE_ACCESS_KEY_ID: true,
+  GARAGE_BUCKET: true,
+  GARAGE_ENDPOINT: true,
+  GARAGE_REGION: true,
+  GARAGE_SECRET_ACCESS_KEY: true,
+  NODE_ENV: true,
+});
+
+export type DocumentWorkerEnvironment = z.infer<
+  typeof documentWorkerEnvironmentSchema
+>;
+
 export function parseEnvironment(input: NodeJS.ProcessEnv): Environment {
   return environmentSchema.parse(input);
+}
+
+export function parseDocumentWorkerEnvironment(
+  input: NodeJS.ProcessEnv,
+): DocumentWorkerEnvironment {
+  return documentWorkerEnvironmentSchema.parse(input);
 }
 
 export function formatEnvironmentError(error: z.ZodError): string {

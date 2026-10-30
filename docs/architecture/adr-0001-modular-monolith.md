@@ -1,6 +1,6 @@
 # ADR-0001: pnpm modular monolith with isolated document worker
 
-- **Status:** Proposed for review
+- **Status:** Accepted and implemented through C2
 - **Date:** 2026-10-29
 - **Tickets:** RES-001, RES-002, RES-003, RES-010, RES-012, RES-020
 
@@ -48,16 +48,16 @@ security will be evaluated separately rather than claimed implicitly.
 Document processing uses an explicit state machine:
 
 ```text
-created -> quarantined -> validating -> scanning -> released
-                         |             |          |
-                         +-----------> rejected <-+
-                                       |
-                                     failed
+created -> quarantined -> processing -> available
+                         |       |
+                         |       +-> rejected
+                         +-> retry after bounded lease
 ```
 
-Only `released` immutable versions may be previewed. Job creation and the
-corresponding audit event occur in the same database transaction (outbox pattern).
-Temporal may later consume the same job boundary; it is not required to run v0.1.
+Only `available` immutable versions may be previewed. Processing events are
+append-only, workers claim work with `FOR UPDATE SKIP LOCKED`, and stale
+processing leases can be retried. Temporal may later consume the same job
+boundary; it is not required to run v0.1.
 
 ## Consequences
 

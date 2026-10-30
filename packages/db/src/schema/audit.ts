@@ -35,6 +35,7 @@ export const auditEvents = resurgoSchema.table(
     outcome: auditOutcome("outcome").notNull(),
     reasonCode: text("reason_code"),
     correlationId: uuid("correlation_id").notNull(),
+    nonce: uuid("nonce"),
     causationId: uuid("causation_id"),
     occurredAt: timestamp("occurred_at", {
       mode: "date",

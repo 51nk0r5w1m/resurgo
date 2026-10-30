@@ -64,6 +64,34 @@
       "when": 1793342170019,
       "tag": "0008_married_cerebro",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793344623419,
+      "tag": "0009_chunky_eddie_brock",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793346882376,
+      "tag": "0010_odd_hawkeye",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793347826878,
+      "tag": "0011_enforce_review_integrity",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793348428781,
+      "tag": "0012_enforce_single_review_root",
+      "breakpoints": true
     }
   ]
 }
