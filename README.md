@@ -5,7 +5,6 @@
 ![Resurgo Platform Wireframes](docs/brand/resurgo-wireframes.png)
 
 **Divorce is complicated. Finding your way shouldn't be.**
-
 Resurgo is an open-source-first divorce transition coordination platform. Its purpose is to replace fragmented email chains with guided discovery, personalized case roadmaps, secure document exchange, and carefully scoped professional handoffs.
 
 ## Product boundaries
