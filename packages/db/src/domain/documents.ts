@@ -450,6 +450,24 @@ export async function addDocumentVersion(
         versionNumber: latest.version_number + 1,
       })
       .returning();
+    await transaction
+      .insert(documentContributors)
+      .values({
+        caseId: input.caseId,
+        caseMembershipId: authorization.caseMembershipId,
+        documentId: input.documentId,
+        role: "version_author",
+        status: "active",
+      })
+      .onConflictDoUpdate({
+        target: [
+          documentContributors.caseId,
+          documentContributors.documentId,
+          documentContributors.caseMembershipId,
+          documentContributors.role,
+        ],
+        set: { status: "active" },
+      });
     if (!version) throw new Error("Document version creation failed");
     await invalidateReviewsForEvidenceChange(transaction, {
       actorCaseMembershipId: authorization.caseMembershipId,
