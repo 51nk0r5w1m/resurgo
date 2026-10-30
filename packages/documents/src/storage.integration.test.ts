@@ -5,20 +5,20 @@ import { afterEach, describe, expect, test } from "vitest";
 import { documentObjectKeys } from "./keys";
 import { createS3PrivateObjectStorage } from "./storage";
 
-const required = (name: string) => {
-  const value = process.env[name];
-  if (!value)
-    throw new Error(`${name} is required for storage integration tests`);
-  return value;
+const garageConfiguration = {
+  accessKeyId: process.env.GARAGE_ACCESS_KEY_ID,
+  bucket: process.env.GARAGE_BUCKET,
+  endpoint: process.env.GARAGE_ENDPOINT,
+  region: process.env.GARAGE_REGION,
+  secretAccessKey: process.env.GARAGE_SECRET_ACCESS_KEY,
 };
-
-const storage = createS3PrivateObjectStorage({
-  accessKeyId: required("GARAGE_ACCESS_KEY_ID"),
-  bucket: required("GARAGE_BUCKET"),
-  endpoint: required("GARAGE_ENDPOINT"),
-  region: required("GARAGE_REGION"),
-  secretAccessKey: required("GARAGE_SECRET_ACCESS_KEY"),
-});
+const garageConfigured = Object.values(garageConfiguration).every(Boolean);
+const storage = garageConfigured
+  ? createS3PrivateObjectStorage(
+      garageConfiguration as Record<keyof typeof garageConfiguration, string>,
+    )
+  : undefined;
+const storageSuite = garageConfigured ? describe : describe.skip;
 
 const keys = documentObjectKeys({
   caseId: randomUUID(),
@@ -27,6 +27,7 @@ const keys = documentObjectKeys({
 });
 
 afterEach(async () => {
+  if (!storage) return;
   await Promise.all(
     Object.values(keys).map((key) =>
       storage.delete(key).catch(() => undefined),
@@ -34,8 +35,9 @@ afterEach(async () => {
   );
 });
 
-describe("private S3-compatible storage", () => {
+storageSuite("private S3-compatible storage", () => {
   test("stores, bounds, promotes, and removes an opaque quarantine object", async () => {
+    if (!storage) throw new Error("Garage test storage was not initialized");
     const source = Buffer.from("Synthetic Resurgo storage fixture.");
     const contentHash = createHash("sha256").update(source).digest("hex");
 
@@ -61,6 +63,7 @@ describe("private S3-compatible storage", () => {
   });
 
   test("does not permit unauthenticated object reads", async () => {
+    if (!storage) throw new Error("Garage test storage was not initialized");
     const source = Buffer.from("Synthetic private object fixture.");
     await storage.put({
       body: source,
@@ -70,8 +73,8 @@ describe("private S3-compatible storage", () => {
     });
 
     const objectUrl = new URL(
-      `${required("GARAGE_BUCKET")}/${keys.quarantine}`,
-      `${required("GARAGE_ENDPOINT")}/`,
+      `${garageConfiguration.bucket}/${keys.quarantine}`,
+      `${garageConfiguration.endpoint}/`,
     );
     const response = await fetch(objectUrl);
     expect([401, 403]).toContain(response.status);

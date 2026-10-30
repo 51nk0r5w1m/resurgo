@@ -75,8 +75,11 @@ export async function processQuarantinedDocument(input: {
     );
   }
 
+  let availableCopied = false;
+  let previewWritten = false;
   try {
     await input.storage.copy(keys.quarantine, keys.available);
+    availableCopied = true;
     if (validated.format === "pdf") {
       const preview = await createRasterizedPdfPreview(bytes);
       await input.storage.put({
@@ -85,9 +88,18 @@ export async function processQuarantinedDocument(input: {
         contentType: "application/pdf",
         key: keys.preview,
       });
+      previewWritten = true;
     }
     await input.storage.delete(keys.quarantine);
   } catch {
+    await Promise.all([
+      ...(availableCopied
+        ? [input.storage.delete(keys.available).catch(() => undefined)]
+        : []),
+      ...(previewWritten
+        ? [input.storage.delete(keys.preview).catch(() => undefined)]
+        : []),
+    ]);
     throw new DocumentProcessingError(
       "Validated document could not be released",
       "storage_failure",

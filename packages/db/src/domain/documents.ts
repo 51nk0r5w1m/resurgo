@@ -521,6 +521,7 @@ export async function grantDocumentAccess(
     );
     const consents = await transaction
       .select({
+        expiresAt: disclosureConsents.expiresAt,
         id: disclosureConsents.id,
         operation: disclosureConsents.operation,
       })
@@ -553,16 +554,25 @@ export async function grantDocumentAccess(
     const grants = await transaction
       .insert(resourceGrants)
       .values(
-        input.grants.map(({ operation, sourceConsentId }) => ({
-          basis: "explicit_consent" as const,
-          caseId: input.caseId,
-          classification: document.classification,
-          expiresAt: input.expiresAt,
-          granteeCaseMembershipId: input.granteeCaseMembershipId,
-          operation,
-          resourceId: document.resourceId,
-          sourceConsentId,
-        })),
+        input.grants.map(({ operation, sourceConsentId }) => {
+          const consent = consents.find(({ id }) => id === sourceConsentId);
+          if (!consent) throw new AuthorizationDeniedError();
+          const expiresAt =
+            consent.expiresAt &&
+            (!input.expiresAt || consent.expiresAt < input.expiresAt)
+              ? consent.expiresAt
+              : input.expiresAt;
+          return {
+            basis: "explicit_consent" as const,
+            caseId: input.caseId,
+            classification: document.classification,
+            expiresAt,
+            granteeCaseMembershipId: input.granteeCaseMembershipId,
+            operation,
+            resourceId: document.resourceId,
+            sourceConsentId,
+          };
+        }),
       )
       .returning();
     if (input.grants.some(({ operation }) => operation === "contribute")) {

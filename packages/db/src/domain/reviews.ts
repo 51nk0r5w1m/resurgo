@@ -1,4 +1,6 @@
-import { and, eq, sql } from "drizzle-orm";
+import { createHash } from "node:crypto";
+
+import { and, asc, eq, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import * as schema from "../schema";
@@ -51,6 +53,31 @@ type EvidenceReference = {
   documentVersionId: string;
   purpose: string;
 };
+
+export function computeProfessionalReviewStatementHash(input: {
+  decisionContext: string;
+  reviewScope: string;
+  statements: ReviewStatement[];
+}) {
+  const statements = [...input.statements]
+    .map(({ body, conditionStatus, type }) => ({
+      body,
+      conditionStatus: conditionStatus ?? null,
+      type,
+    }))
+    .sort((left, right) =>
+      JSON.stringify(left).localeCompare(JSON.stringify(right)),
+    );
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        decisionContext: input.decisionContext,
+        reviewScope: input.reviewScope,
+        statements,
+      }),
+    )
+    .digest("hex");
+}
 
 const transitions: Record<ReviewStatus, readonly ReviewStatus[]> = {
   assigned: ["in_progress", "withdrawn", "superseded"],
@@ -748,7 +775,9 @@ export async function recordAttorneyReviewAcknowledgement(
     if (actor.role !== "attorney") throw new AuthorizationDeniedError();
     const [revision] = await transaction
       .select({
+        decisionContext: professionalReviewRevisions.decisionContext,
         id: professionalReviewRevisions.id,
+        reviewScope: professionalReviewRevisions.reviewScope,
         status: professionalReviewRevisions.status,
       })
       .from(professionalReviewRevisions)
@@ -764,6 +793,43 @@ export async function recordAttorneyReviewAcknowledgement(
       )
       .limit(1);
     if (!revision || revision.status !== "completed") {
+      throw new AuthorizationDeniedError();
+    }
+    const statements = await transaction
+      .select({
+        body: professionalReviewStatements.body,
+        conditionStatus: professionalReviewStatements.conditionStatus,
+        type: professionalReviewStatements.type,
+      })
+      .from(professionalReviewStatements)
+      .where(
+        and(
+          eq(professionalReviewStatements.caseId, input.caseId),
+          eq(
+            professionalReviewStatements.professionalReviewId,
+            input.professionalReviewId,
+          ),
+          eq(
+            professionalReviewStatements.reviewRevisionId,
+            input.reviewRevisionId,
+          ),
+        ),
+      )
+      .orderBy(
+        asc(professionalReviewStatements.type),
+        asc(professionalReviewStatements.body),
+        asc(professionalReviewStatements.id),
+      );
+    const expectedHash = computeProfessionalReviewStatementHash({
+      decisionContext: revision.decisionContext,
+      reviewScope: revision.reviewScope,
+      statements: statements.map(({ body, conditionStatus, type }) => ({
+        body,
+        ...(conditionStatus ? { conditionStatus } : {}),
+        type,
+      })),
+    });
+    if (input.statementHash !== expectedHash) {
       throw new AuthorizationDeniedError();
     }
     const [event] = await transaction

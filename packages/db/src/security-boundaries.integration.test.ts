@@ -38,6 +38,7 @@ import {
 } from "./domain/discovery";
 import {
   appendProfessionalReviewRevision,
+  computeProfessionalReviewStatementHash,
   createProfessionalReview,
   grantProfessionalReviewAccess,
   listAuthorizedProfessionalReviews,
@@ -1103,12 +1104,14 @@ describe("immutable document and professional review foundations", () => {
       documentVersionId: document.version.id,
       status: "available",
     });
+    const consentExpiry = new Date(Date.now() + 60 * 60 * 1000);
     const lenderConsents = await database
       .insert(schema.disclosureConsents)
       .values(
         (["view", "contribute"] as const).map((operation) => ({
           caseId: clientCase.id,
           classification: "financial" as const,
+          expiresAt: consentExpiry,
           grantorCaseMembershipId: ownerMembership.id,
           operation,
           purpose: "Synthetic mortgage specialist review",
@@ -1124,7 +1127,7 @@ describe("immutable document and professional review foundations", () => {
       ({ operation }) => operation === "contribute",
     );
     if (!lenderView || !lenderContribute) throw new Error("Consents missing");
-    await grantDocumentAccess(database, {
+    const documentGrants = await grantDocumentAccess(database, {
       caseId: clientCase.id,
       documentId: document.document.id,
       granteeCaseMembershipId: lenderMembership.id,
@@ -1134,6 +1137,12 @@ describe("immutable document and professional review foundations", () => {
       ],
       userId: owner.id,
     });
+    expect(documentGrants).toHaveLength(2);
+    expect(
+      documentGrants.every(
+        ({ expiresAt }) => expiresAt?.getTime() === consentExpiry.getTime(),
+      ),
+    ).toBe(true);
     const review = await createProfessionalReview(database, {
       caseId: clientCase.id,
       classification: "financial",
@@ -1232,14 +1241,57 @@ describe("immutable document and professional review foundations", () => {
       professionalReviewId: review.review.id,
       userId: owner.id,
     });
+    await expect(
+      recordAttorneyReviewAcknowledgement(database, {
+        action: "acknowledged",
+        caseId: clientCase.id,
+        professionalReviewId: review.review.id,
+        reviewRevisionId: completed.id,
+        statementHash: "f".repeat(64),
+        userId: attorney.id,
+      }),
+    ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
     await recordAttorneyReviewAcknowledgement(database, {
       action: "acknowledged",
       caseId: clientCase.id,
       professionalReviewId: review.review.id,
       reviewRevisionId: completed.id,
-      statementHash: "f".repeat(64),
+      statementHash: computeProfessionalReviewStatementHash({
+        decisionContext: "Synthetic specialist review completed.",
+        reviewScope: "Record factual findings without an eligibility decision.",
+        statements: [
+          {
+            body: "Qualified professional review remains required for any decision.",
+            type: "finding",
+          },
+        ],
+      }),
       userId: attorney.id,
     });
+    await expectDatabaseError(
+      database.insert(schema.professionalReviewRevisions).values({
+        caseId: clientCase.id,
+        createdByCaseMembershipId: ownerMembership.id,
+        decisionContext: "Synthetic invalid lineage",
+        professionalReviewId: review.review.id,
+        reviewScope: "This revision skips its immediate predecessor.",
+        revision: 99,
+        status: "superseded",
+        supersedesRevisionId: completed.id,
+      }),
+      "23514",
+    );
+    await expectDatabaseError(
+      database.insert(schema.professionalReviewAcknowledgements).values({
+        action: "acknowledged",
+        attorneyCaseMembershipId: ownerMembership.id,
+        caseId: clientCase.id,
+        professionalReviewId: review.review.id,
+        reviewRevisionId: completed.id,
+        statementHash: "a".repeat(64),
+      }),
+      "23514",
+    );
     await expect(
       listAuthorizedProfessionalReviews(database, {
         caseId: clientCase.id,

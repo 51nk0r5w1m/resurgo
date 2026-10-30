@@ -95,4 +95,26 @@ describe("quarantined document processor", () => {
     expect(objects.has(keys.available)).toBe(false);
     expect(objects.has(keys.preview)).toBe(false);
   });
+
+  it("removes the available copy when preview publication fails", async () => {
+    const source = await syntheticPdf();
+    const keys = documentObjectKeys(identifiers);
+    const { objects, storage } = memoryStorage({ [keys.quarantine]: source });
+    storage.put = async () => {
+      throw new Error("synthetic preview storage failure");
+    };
+
+    await expect(
+      processQuarantinedDocument({
+        ...identifiers,
+        contentHash: createHash("sha256").update(source).digest("hex"),
+        declaredMimeType: "application/pdf",
+        scan: async () => ({ clean: true }),
+        storage,
+      }),
+    ).rejects.toMatchObject({ failureCode: "storage_failure" });
+    expect(objects.has(keys.quarantine)).toBe(true);
+    expect(objects.has(keys.available)).toBe(false);
+    expect(objects.has(keys.preview)).toBe(false);
+  });
 });

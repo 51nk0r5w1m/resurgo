@@ -47,6 +47,13 @@ describe("document structural validation", () => {
     expect(preview.byteLength).toBeGreaterThan(0);
   });
 
+  it("rejects a preview before allocating beyond the pixel budget", async () => {
+    const source = await syntheticPdf();
+    await expect(
+      createRasterizedPdfPreview(source, { maximumPixelsPerPage: 1_000 }),
+    ).rejects.toThrow("PDF page exceeds the preview pixel limit");
+  });
+
   it("rejects malformed, traversal, and macro-enabled OOXML", async () => {
     await expect(
       validateDocumentStructure(

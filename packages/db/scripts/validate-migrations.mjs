@@ -176,8 +176,10 @@ try {
     "document_request_events_immutable",
     "document_versions_immutable",
     "professional_review_acknowledgements_immutable",
+    "professional_review_acknowledgement_attorney_enforced",
     "professional_review_evidence_immutable",
     "professional_review_revisions_immutable",
+    "professional_review_revision_lineage_enforced",
     "professional_review_statements_immutable",
     "resource_grants_case_owner_basis_check",
   ]) {

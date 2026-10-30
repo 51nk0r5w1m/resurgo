@@ -57,8 +57,8 @@ function memoryStorage(initial: Record<string, Uint8Array>) {
 }
 
 describe.skipIf(!databaseUrl)("document worker state transitions", () => {
-  let admin: pg.Client;
-  let database: ReturnType<typeof createDatabase>;
+  let admin: pg.Client | undefined;
+  let database: ReturnType<typeof createDatabase> | undefined;
 
   beforeAll(async () => {
     admin = new pg.Client({ connectionString: adminUrl.toString() });
@@ -74,7 +74,8 @@ describe.skipIf(!databaseUrl)("document worker state transitions", () => {
   });
 
   afterAll(async () => {
-    await database.pool.end();
+    await database?.pool.end();
+    if (!admin) return;
     await admin.query(
       "select pg_terminate_backend(pid) from pg_stat_activity where datname = $1",
       [databaseName],
@@ -84,6 +85,7 @@ describe.skipIf(!databaseUrl)("document worker state transitions", () => {
   });
 
   test("publishes only after processing and leaves scanner failures unavailable", async () => {
+    if (!database) throw new Error("Worker test database was not initialized");
     const [owner] = await database.db
       .insert(user)
       .values({
