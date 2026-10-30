@@ -1,9 +1,16 @@
-import { listAuthorizedCaseMembers } from "@resurgo/db";
+import {
+  listAuthorizedCaseMembers,
+  listAuthorizedDocumentDisclosures,
+  listAuthorizedDocuments,
+  listVerifiedPilotProfessionals,
+} from "@resurgo/db";
 import { ShieldCheck, UserRound } from "lucide-react";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
 import { CasePageHeader } from "../../../../components/case-page-header";
+import { DocumentDisclosurePanel } from "../../../../components/document-disclosure-panel";
+import { ProfessionalInvitationForm } from "../../../../components/professional-invitation-form";
 import { getAuth, getDatabase } from "../../../../lib/auth";
 import { formatRole } from "../../../../lib/presentation";
 
@@ -15,10 +22,24 @@ export default async function ProfessionalsPage({
   const session = await getAuth().api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
   const { caseId } = await params;
-  const members = await listAuthorizedCaseMembers(getDatabase(), {
-    caseId,
-    userId: session.user.id,
-  }).catch(() => notFound());
+  const [members, professionals, documents, disclosures] = await Promise.all([
+    listAuthorizedCaseMembers(getDatabase(), {
+      caseId,
+      userId: session.user.id,
+    }),
+    listVerifiedPilotProfessionals(getDatabase(), {
+      caseId,
+      userId: session.user.id,
+    }),
+    listAuthorizedDocuments(getDatabase(), {
+      caseId,
+      userId: session.user.id,
+    }),
+    listAuthorizedDocumentDisclosures(getDatabase(), {
+      caseId,
+      userId: session.user.id,
+    }),
+  ]).catch(() => notFound());
   return (
     <main className="case-page">
       <CasePageHeader
@@ -26,6 +47,18 @@ export default async function ProfessionalsPage({
         summary="Case participation is explicit. Organization affiliation alone never grants access to this case or its documents."
         title="Your coordination team"
       />
+      <section className="workspace-card collaboration-action-card">
+        <p className="eyebrow">Invite a verified pilot participant</p>
+        <h2>Start with case participation—not blanket access</h2>
+        <p>
+          The professional must accept the invitation. Documents and restricted
+          facts remain private until you create a separate, explicit disclosure.
+        </p>
+        <ProfessionalInvitationForm
+          caseId={caseId}
+          professionals={professionals}
+        />
+      </section>
       <section className="team-grid">
         {members.map((member) => (
           <article className="workspace-card team-card" key={member.id}>
@@ -53,6 +86,33 @@ export default async function ProfessionalsPage({
           </p>
         </section>
       )}
+      <DocumentDisclosurePanel
+        caseId={caseId}
+        disclosures={disclosures}
+        documents={documents
+          .filter(({ processing_status }) => processing_status === "available")
+          .map((document) => ({
+            id: document.document_id,
+            title: document.title,
+          }))}
+        professionals={members
+          .filter(
+            (member) =>
+              member.status === "active" &&
+              [
+                "attorney",
+                "lender",
+                "accountant",
+                "mediator",
+                "support_professional",
+              ].includes(member.role),
+          )
+          .map((member) => ({
+            id: member.id,
+            name: member.name,
+            role: member.role,
+          }))}
+      />
     </main>
   );
 }

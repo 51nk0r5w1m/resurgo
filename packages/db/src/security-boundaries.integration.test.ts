@@ -14,6 +14,10 @@ import {
 } from "./domain/authorization";
 import { createCaseWithOwner } from "./domain/cases";
 import {
+  authorizeDocumentDisclosure,
+  revokeDocumentDisclosure,
+} from "./domain/disclosures";
+import {
   createDocumentRequest,
   listAuthorizedDocumentRequests,
   transitionDocumentRequest,
@@ -28,13 +32,17 @@ import {
   recordDocumentProcessingEvent,
 } from "./domain/documents";
 import {
+  acceptCaseMembership,
   grantCaseMembership,
   revokeCaseMembership,
 } from "./domain/memberships";
 import {
+  applicableDiscoveryQuestions,
   completeDiscovery,
   getDiscoveryState,
   saveDiscoveryAnswer,
+  type DiscoveryAnswer,
+  type DiscoveryAnswers,
 } from "./domain/discovery";
 import {
   appendProfessionalReviewRevision,
@@ -1445,6 +1453,87 @@ describe("immutable document and professional review foundations", () => {
     ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
   });
 
+  test("revokes client-controlled document disclosure and dependent access immediately", async () => {
+    const owner = await createSyntheticUser("disclosure-owner");
+    const professional = await createSyntheticUser("disclosure-professional");
+    const { case: clientCase } = await createCaseWithOwner(database, {
+      jurisdictionCode: "GA-FULTON-SUPERIOR",
+      ownerUserId: owner.id,
+    });
+    const organization = await createVerifiedOrganization(
+      "Synthetic Disclosure Law Firm",
+      "law_firm",
+      owner.id,
+    );
+    const organizationMembership = await createProfessionalMembership(
+      professional.id,
+      organization.id,
+    );
+    const [professionalMembership] = await database
+      .insert(schema.caseMemberships)
+      .values({
+        caseId: clientCase.id,
+        organizationMembershipId: organizationMembership.id,
+        role: "attorney",
+        status: "active",
+        userId: professional.id,
+        validFrom: new Date(),
+      })
+      .returning();
+    if (!professionalMembership) throw new Error("Membership was not created");
+    const created = await createDocumentWithVersion(database, {
+      byteSize: 512,
+      caseId: clientCase.id,
+      classification: "legal",
+      confidentiality: "attorney_client",
+      contentHash: "7".repeat(64),
+      format: "pdf",
+      mimeType: "application/pdf",
+      retentionClass: "synthetic_disclosure_record",
+      source: "client_upload",
+      title: "Synthetic disclosure evidence",
+      userId: owner.id,
+    });
+    await database.insert(schema.documentProcessingEvents).values({
+      caseId: clientCase.id,
+      documentId: created.document.id,
+      documentVersionId: created.version.id,
+      status: "available",
+    });
+    await authorizeDocumentDisclosure(database, {
+      caseId: clientCase.id,
+      documentId: created.document.id,
+      operations: ["view", "download"],
+      purpose: "Synthetic qualified professional review",
+      recipientCaseMembershipId: professionalMembership.id,
+      userId: owner.id,
+    });
+    await expect(
+      getAuthorizedAvailableDocumentVersion(database, {
+        caseId: clientCase.id,
+        documentId: created.document.id,
+        operation: "view",
+        userId: professional.id,
+        versionId: created.version.id,
+      }),
+    ).resolves.toMatchObject({ versionId: created.version.id });
+    await revokeDocumentDisclosure(database, {
+      caseId: clientCase.id,
+      documentId: created.document.id,
+      recipientCaseMembershipId: professionalMembership.id,
+      userId: owner.id,
+    });
+    await expect(
+      getAuthorizedAvailableDocumentVersion(database, {
+        caseId: clientCase.id,
+        documentId: created.document.id,
+        operation: "view",
+        userId: professional.id,
+        versionId: created.version.id,
+      }),
+    ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
+  });
+
   test("rejects terminal processing regressions and serializes legal holds", async () => {
     const owner = await createSyntheticUser("document-lifecycle-owner");
     const { case: clientCase } = await createCaseWithOwner(database, {
@@ -1805,6 +1894,19 @@ describe("central case authorization", () => {
     });
 
     await expect(
+      decideCaseAuthorization(database, {
+        caseId: clientCase.id,
+        operation: "read",
+        userId: client.id,
+      }),
+    ).resolves.toMatchObject({ allowed: false });
+    await acceptCaseMembership(database, {
+      caseId: clientCase.id,
+      membershipId: membership.id,
+      userId: client.id,
+    });
+
+    await expect(
       grantCaseMembership(database, {
         actorUserId: client.id,
         caseId: clientCase.id,
@@ -1896,43 +1998,28 @@ describe("versioned discovery and roadmap", () => {
         ownerUserId: owner.id,
       },
     );
-    await saveDiscoveryAnswer(database, {
-      caseId: clientCase.id,
-      questionKey: "property_status",
-      userId: owner.id,
-      value: "solely_owned",
-    });
-    await saveDiscoveryAnswer(database, {
-      caseId: clientCase.id,
-      questionKey: "property_status",
-      userId: owner.id,
-      value: "jointly_owned",
-    });
-    await saveDiscoveryAnswer(database, {
-      caseId: clientCase.id,
-      questionKey: "mortgage_status",
-      userId: owner.id,
-      value: "yes",
-    });
-    await saveDiscoveryAnswer(database, {
-      caseId: clientCase.id,
-      questionKey: "financial_complexity",
-      userId: owner.id,
-      value: "complex",
-    });
-    await saveDiscoveryAnswer(database, {
-      caseId: clientCase.id,
-      questionKey: "support_interest",
-      userId: owner.id,
-      value: "yes",
-    });
+    const answer = (value: unknown) =>
+      ({
+        source: "client_reported",
+        status: "answered",
+        value,
+        verificationStatus: "client_confirmed",
+      }) satisfies DiscoveryAnswer;
+    for (const value of ["jointly_owned", "no_real_property"]) {
+      await saveDiscoveryAnswer(database, {
+        answer: answer(value),
+        caseId: clientCase.id,
+        questionKey: "property_status",
+        userId: owner.id,
+      });
+    }
 
     const resumed = await getDiscoveryState(database, {
       caseId: clientCase.id,
       userId: owner.id,
     });
-    expect(resumed.answers.property_status).toBe("jointly_owned");
-    expect(resumed.session.revision).toBe(5);
+    expect(resumed.answers.property_status?.value).toBe("no_real_property");
+    expect(resumed.session.revision).toBe(2);
     expect(
       await database
         .select()
@@ -1955,9 +2042,46 @@ describe("versioned discovery and roadmap", () => {
       .from(schema.auditEvents)
       .where(eq(schema.auditEvents.action, "discovery.answer.saved"));
     const serializedEvents = JSON.stringify(answerEvents);
-    expect(answerEvents).toHaveLength(5);
+    expect(answerEvents).toHaveLength(2);
     expect(serializedEvents).not.toContain("jointly_owned");
-    expect(serializedEvents).not.toContain("complex");
+    expect(serializedEvents).not.toContain("no_real_property");
+
+    const defaults: Record<string, unknown> = {
+      asset_types: ["none_known"],
+      business_interest: "no",
+      debt_certainty: "confident",
+      desired_services: ["none"],
+      divorce_stage: "considering",
+      existing_orders: ["none"],
+      filing_jurisdiction_confirmed: "yes",
+      has_dependents: "no",
+      income_sources: ["other"],
+      representation_status: "self_represented",
+      safe_to_contact: "yes",
+      safety_concerns: ["none"],
+    };
+    let workingAnswers: DiscoveryAnswers = resumed.answers;
+    while (true) {
+      const missing = applicableDiscoveryQuestions(workingAnswers).filter(
+        ({ key, required }) => required && !workingAnswers[key],
+      );
+      if (!missing.length) break;
+      for (const question of missing) {
+        const value =
+          defaults[question.key] ??
+          (question.type === "multiple_choice"
+            ? [question.options?.[0]?.value]
+            : question.options?.[0]?.value);
+        const savedAnswer = answer(value);
+        await saveDiscoveryAnswer(database, {
+          answer: savedAnswer,
+          caseId: clientCase.id,
+          questionKey: question.key,
+          userId: owner.id,
+        });
+        workingAnswers = { ...workingAnswers, [question.key]: savedAnswer };
+      }
+    }
 
     const completed = await completeDiscovery(database, {
       caseId: clientCase.id,
@@ -1965,11 +2089,9 @@ describe("versioned discovery and roadmap", () => {
     });
     expect(completed.recommendations.map(({ service }) => service)).toEqual([
       "divorce_attorney",
-      "mortgage_specialist",
-      "financial_specialist",
-      "personal_support",
     ]);
-    expect(completed.roadmap).toHaveLength(4);
+    expect(completed.outputs).toHaveLength(0);
+    expect(completed.roadmap).toHaveLength(1);
     expect(completed.roadmap[0]?.status).toBe("ready");
 
     await expect(
@@ -1978,35 +2100,6 @@ describe("versioned discovery and roadmap", () => {
         userId: unrelated.id,
       }),
     ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
-  });
-
-  test("completes the no-property branch without a mortgage answer", async () => {
-    const owner = await createSyntheticUser("no-property-owner");
-    const { case: clientCase } = await createCaseWithOwner(database, {
-      jurisdictionCode: "GA-DEKALB-SUPERIOR",
-      ownerUserId: owner.id,
-    });
-    for (const [questionKey, value] of [
-      ["property_status", "jointly_owned"],
-      ["mortgage_status", "yes"],
-      ["property_status", "no_real_property"],
-      ["financial_complexity", "straightforward"],
-      ["support_interest", "none"],
-    ] as const) {
-      await saveDiscoveryAnswer(database, {
-        caseId: clientCase.id,
-        questionKey,
-        userId: owner.id,
-        value,
-      });
-    }
-    const completed = await completeDiscovery(database, {
-      caseId: clientCase.id,
-      userId: owner.id,
-    });
-    expect(completed.recommendations.map(({ service }) => service)).toEqual([
-      "divorce_attorney",
-    ]);
   });
 });
 

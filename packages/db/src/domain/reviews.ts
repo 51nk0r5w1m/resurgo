@@ -754,7 +754,16 @@ export async function listAuthorizedProfessionalReviews(
         });
       }
     }
-    authorized.push({ ...row, evidence, statements });
+    const statementHash = computeProfessionalReviewStatementHash({
+      decisionContext: row.decisionContext,
+      reviewScope: row.reviewScope,
+      statements: statements.map(({ body, conditionStatus, type }) => ({
+        body,
+        ...(conditionStatus ? { conditionStatus } : {}),
+        type,
+      })),
+    });
+    authorized.push({ ...row, evidence, statementHash, statements });
   }
   return authorized;
 }

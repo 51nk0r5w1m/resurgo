@@ -18,22 +18,26 @@ PostgreSQL, Garage, ClamAV, and the document worker.
 - Immutable replacement versions and version-specific comments.
 - PDF side-by-side version viewing and Docxodus redline comparison for DOCX.
 - Negative cross-case document access denial.
+- Versioned, adaptive 40-question discovery engine across nine Georgia-focused
+  modules with save/resume, backward correction, provenance, non-answer states,
+  structured values, document references, and applicable-question progress.
+- Deterministic professional recommendations, document requests, review triggers,
+  and explainable roadmap items, validated across five distinct synthetic cases.
 
 ## Backend only
 
-- Professional Review Register revisions, evidence links, acknowledgements, and
-  supersession are persisted and authorized, but assignment/acknowledgement UI is
-  not yet a complete professional workflow.
-- Document grants and disclosure consent are enforced by the domain layer, but
-  the client sharing-management interface is not complete.
+- Verified-pilot professional invitation, explicit acceptance, granular document
+  disclosure/revocation, review assignment, immutable review revisions,
+  evidence-linked findings, and attorney acknowledgement are implemented in the
+  case workspace. The complete multi-user professional journey still requires a
+  dedicated Playwright fixture and is not yet browser-tested.
 - Document requests are persisted and actionable, but notification delivery is
   not implemented.
-- Versioned Atlanta discovery definitions and deterministic rule definitions
-  exist, but the current interview UI has not yet migrated to the new engine.
 
 ## Not implemented
 
-- Professional invitation and verified-pilot onboarding UI.
+- Self-service professional organization verification (pilot participants remain
+  administratively verified).
 - Scheduling and appointments.
 - Court filing adapters, Docassemble, billing, electronic signatures, Docxodus
   editing, and OpenContracts intelligence.

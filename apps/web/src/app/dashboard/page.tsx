@@ -1,18 +1,22 @@
+import { listAccessibleCases, listPendingCaseInvitations } from "@resurgo/db";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { SignOutButton } from "../../components/sign-out-button";
 import { CaseCreationForm } from "../../components/case-creation-form";
+import { CaseInvitationAction } from "../../components/case-invitation-action";
 import { getAuth, getDatabase } from "../../lib/auth";
-import { listAccessibleCases } from "@resurgo/db";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const session = await getAuth().api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
-  const cases = await listAccessibleCases(getDatabase(), session.user.id);
+  const [cases, invitations] = await Promise.all([
+    listAccessibleCases(getDatabase(), session.user.id),
+    listPendingCaseInvitations(getDatabase(), session.user.id),
+  ]);
 
   return (
     <main className="dashboard-shell">
@@ -28,6 +32,26 @@ export default async function DashboardPage() {
         <p>Start your transition without inviting or notifying a spouse.</p>
       </section>
       <section className="dashboard-grid">
+        {invitations.map((invitation) => (
+          <article className="dashboard-card" key={invitation.membershipId}>
+            <p className="eyebrow">Verified pilot invitation</p>
+            <h2>{invitation.role.replaceAll("_", " ")} participation</h2>
+            <p>
+              {invitation.organizationName ?? "Case participant"} ·{" "}
+              {invitation.jurisdictionCode === "GA-FULTON-SUPERIOR"
+                ? "Fulton County Superior Court"
+                : "DeKalb County Superior Court"}
+            </p>
+            <p>
+              Accepting case participation does not grant access to any
+              document. Each disclosure still requires explicit consent.
+            </p>
+            <CaseInvitationAction
+              caseId={invitation.caseId}
+              membershipId={invitation.membershipId}
+            />
+          </article>
+        ))}
         <article className="dashboard-card">
           <p className="eyebrow">Account security</p>
           <h2>Protect your sign-in</h2>
