@@ -19,4 +19,5 @@ export * from "./domain/documents";
 export * from "./domain/document-requests";
 export * from "./domain/reviews";
 export * from "./domain/workspace";
+export * from "./domain/workflows";
 export * from "./schema";

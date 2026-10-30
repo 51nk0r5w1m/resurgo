@@ -6,9 +6,12 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "../schema";
 import {
   auditEvents,
+  caseTaskEvents,
+  caseTasks,
   caseMemberships,
   caseResources,
   disclosureConsents,
+  discoveryOutputs,
   documents,
   documentVersions,
   professionalReviewAcknowledgements,
@@ -17,6 +20,9 @@ import {
   professionalReviews,
   professionalReviewStatements,
   resourceGrants,
+  reviewPrerequisites,
+  roadmapItems,
+  settlementFeasibilityRevisions,
   user,
 } from "../schema";
 import {
@@ -52,6 +58,20 @@ type EvidenceReference = {
   documentId: string;
   documentVersionId: string;
   purpose: string;
+};
+export type SettlementFeasibilityData = {
+  equityBuyoutAmount?: string;
+  existingMortgageResponsibility: string;
+  financingAssumptions: string;
+  lenderFindings?: string;
+  outstandingConditions?: string;
+  propertyDisposition:
+    "retain_by_client" | "retain_by_spouse" | "sell" | "undecided" | "other";
+  proposedPathway:
+    "refinance" | "assumption" | "sale" | "payoff" | "other" | "undecided";
+  proposedSettlementDeadline?: Date;
+  reviewStage:
+    "feasibility_review" | "preapproval" | "underwriting" | "closing";
 };
 
 export function computeProfessionalReviewStatementHash(input: {
@@ -220,6 +240,8 @@ export async function createProfessionalReview(
     };
     reviewScope: string;
     statements?: ReviewStatement[];
+    settlement?: SettlementFeasibilityData;
+    sourceDiscoveryOutputId?: string;
     subjectResourceId?: string;
     subjectType: SubjectType;
     supersedesReviewId?: string;
@@ -253,6 +275,23 @@ export async function createProfessionalReview(
       ].includes(responsible.role)
     ) {
       throw new AuthorizationDeniedError();
+    }
+    if (input.settlement && responsible.role !== "lender") {
+      throw new AuthorizationDeniedError();
+    }
+    if (input.sourceDiscoveryOutputId) {
+      const [sourceOutput] = await transaction
+        .select({ id: discoveryOutputs.id })
+        .from(discoveryOutputs)
+        .where(
+          and(
+            eq(discoveryOutputs.caseId, input.caseId),
+            eq(discoveryOutputs.id, input.sourceDiscoveryOutputId),
+            eq(discoveryOutputs.type, "review_trigger"),
+          ),
+        )
+        .limit(1);
+      if (!sourceOutput) throw new AuthorizationDeniedError();
     }
     await requireCaseAuthorization(transaction, {
       caseId: input.caseId,
@@ -372,6 +411,7 @@ export async function createProfessionalReview(
         caseResourceId: resource.id,
         createdByCaseMembershipId: owner.caseMembershipId,
         responsibleCaseMembershipId: input.responsibleCaseMembershipId,
+        sourceDiscoveryOutputId: input.sourceDiscoveryOutputId,
         subjectResourceId: input.subjectResourceId,
         subjectType: input.subjectType,
         supersedesReviewId: input.supersedesReviewId,
@@ -420,6 +460,14 @@ export async function createProfessionalReview(
       reviewRevisionId: revision.id,
       statements: input.statements ?? [],
     });
+    if (input.settlement) {
+      await transaction.insert(settlementFeasibilityRevisions).values({
+        caseId: input.caseId,
+        professionalReviewId: review.id,
+        reviewRevisionId: revision.id,
+        ...input.settlement,
+      });
+    }
     await transaction.insert(auditEvents).values(
       buildAuditEvent({
         action: "professional_review.created",
@@ -444,6 +492,7 @@ export async function appendProfessionalReviewRevision(
     professionalReviewId: string;
     reviewScope: string;
     statements?: ReviewStatement[];
+    settlement?: SettlementFeasibilityData;
     status: ReviewStatus;
     userId: string;
   },
@@ -455,6 +504,7 @@ export async function appendProfessionalReviewRevision(
         classification: caseResources.classification,
         responsibleCaseMembershipId:
           professionalReviews.responsibleCaseMembershipId,
+        sourceDiscoveryOutputId: professionalReviews.sourceDiscoveryOutputId,
       })
       .from(professionalReviews)
       .innerJoin(
@@ -491,6 +541,9 @@ export async function appendProfessionalReviewRevision(
       actor.role !== "owner" &&
       actor.caseMembershipId !== review.responsibleCaseMembershipId
     ) {
+      throw new AuthorizationDeniedError();
+    }
+    if (input.settlement && actor.role !== "lender") {
       throw new AuthorizationDeniedError();
     }
     await transaction.execute(sql`
@@ -550,6 +603,14 @@ export async function appendProfessionalReviewRevision(
       reviewRevisionId: revision.id,
       statements: input.statements ?? [],
     });
+    if (input.settlement) {
+      await transaction.insert(settlementFeasibilityRevisions).values({
+        caseId: input.caseId,
+        professionalReviewId: input.professionalReviewId,
+        reviewRevisionId: revision.id,
+        ...input.settlement,
+      });
+    }
     await transaction.insert(auditEvents).values(
       buildAuditEvent({
         action: "professional_review.revision.created",
@@ -561,6 +622,52 @@ export async function appendProfessionalReviewRevision(
         resourceType: "professional_review_revision",
       }),
     );
+    if (input.status === "completed" && review.sourceDiscoveryOutputId) {
+      const tasks = await transaction
+        .select({ id: caseTasks.id })
+        .from(caseTasks)
+        .where(
+          and(
+            eq(caseTasks.caseId, input.caseId),
+            eq(
+              caseTasks.sourceDiscoveryOutputId,
+              review.sourceDiscoveryOutputId,
+            ),
+          ),
+        );
+      for (const task of tasks) {
+        await transaction.insert(caseTaskEvents).values({
+          actorCaseMembershipId: actor.caseMembershipId,
+          caseId: input.caseId,
+          caseTaskId: task.id,
+          status: "completed",
+        });
+      }
+      await transaction
+        .update(roadmapItems)
+        .set({ status: "completed" })
+        .where(
+          and(
+            eq(roadmapItems.caseId, input.caseId),
+            eq(
+              roadmapItems.sourceDiscoveryOutputId,
+              review.sourceDiscoveryOutputId,
+            ),
+          ),
+        );
+      await transaction
+        .update(reviewPrerequisites)
+        .set({ status: "satisfied" })
+        .where(
+          and(
+            eq(reviewPrerequisites.caseId, input.caseId),
+            eq(
+              reviewPrerequisites.sourceDiscoveryOutputId,
+              review.sourceDiscoveryOutputId,
+            ),
+          ),
+        );
+    }
     return revision;
   });
 }
@@ -655,6 +762,18 @@ export async function listAuthorizedProfessionalReviews(
       revision: professionalReviewRevisions.revision,
       status: professionalReviewRevisions.status,
       subjectType: professionalReviews.subjectType,
+      equityBuyoutAmount: settlementFeasibilityRevisions.equityBuyoutAmount,
+      existingMortgageResponsibility:
+        settlementFeasibilityRevisions.existingMortgageResponsibility,
+      financingAssumptions: settlementFeasibilityRevisions.financingAssumptions,
+      lenderFindings: settlementFeasibilityRevisions.lenderFindings,
+      outstandingConditions:
+        settlementFeasibilityRevisions.outstandingConditions,
+      propertyDisposition: settlementFeasibilityRevisions.propertyDisposition,
+      proposedPathway: settlementFeasibilityRevisions.proposedPathway,
+      proposedSettlementDeadline:
+        settlementFeasibilityRevisions.proposedSettlementDeadline,
+      reviewStage: settlementFeasibilityRevisions.reviewStage,
     })
     .from(professionalReviews)
     .innerJoin(
@@ -670,6 +789,23 @@ export async function listAuthorizedProfessionalReviews(
           where latest.case_id = ${professionalReviews.caseId}
             and latest.professional_review_id = ${professionalReviews.id}
         )`,
+      ),
+    )
+    .leftJoin(
+      settlementFeasibilityRevisions,
+      and(
+        eq(
+          settlementFeasibilityRevisions.caseId,
+          professionalReviewRevisions.caseId,
+        ),
+        eq(
+          settlementFeasibilityRevisions.professionalReviewId,
+          professionalReviewRevisions.professionalReviewId,
+        ),
+        eq(
+          settlementFeasibilityRevisions.reviewRevisionId,
+          professionalReviewRevisions.id,
+        ),
       ),
     )
     .innerJoin(
@@ -693,48 +829,85 @@ export async function listAuthorizedProfessionalReviews(
     ) {
       continue;
     }
-    const [candidateEvidence, statements] = await Promise.all([
-      database
-        .select({
-          documentId: professionalReviewEvidence.documentId,
-          documentVersionId: professionalReviewEvidence.documentVersionId,
-          purpose: professionalReviewEvidence.purpose,
-          resourceId: documents.caseResourceId,
-          title: documents.title,
-          versionNumber: documentVersions.versionNumber,
-        })
-        .from(professionalReviewEvidence)
-        .innerJoin(
-          documentVersions,
-          and(
-            eq(
-              documentVersions.id,
-              professionalReviewEvidence.documentVersionId,
+    const [candidateEvidence, statements, acknowledgements] = await Promise.all(
+      [
+        database
+          .select({
+            documentId: professionalReviewEvidence.documentId,
+            documentVersionId: professionalReviewEvidence.documentVersionId,
+            purpose: professionalReviewEvidence.purpose,
+            resourceId: documents.caseResourceId,
+            title: documents.title,
+            versionNumber: documentVersions.versionNumber,
+          })
+          .from(professionalReviewEvidence)
+          .innerJoin(
+            documentVersions,
+            and(
+              eq(
+                documentVersions.id,
+                professionalReviewEvidence.documentVersionId,
+              ),
+              eq(
+                documentVersions.documentId,
+                professionalReviewEvidence.documentId,
+              ),
             ),
+          )
+          .innerJoin(documents, eq(documents.id, documentVersions.documentId))
+          .where(
             eq(
-              documentVersions.documentId,
-              professionalReviewEvidence.documentId,
+              professionalReviewEvidence.reviewRevisionId,
+              row.reviewRevisionId,
             ),
           ),
-        )
-        .innerJoin(documents, eq(documents.id, documentVersions.documentId))
-        .where(
-          eq(professionalReviewEvidence.reviewRevisionId, row.reviewRevisionId),
-        ),
-      database
-        .select({
-          body: professionalReviewStatements.body,
-          conditionStatus: professionalReviewStatements.conditionStatus,
-          type: professionalReviewStatements.type,
-        })
-        .from(professionalReviewStatements)
-        .where(
-          eq(
-            professionalReviewStatements.reviewRevisionId,
-            row.reviewRevisionId,
+        database
+          .select({
+            body: professionalReviewStatements.body,
+            conditionStatus: professionalReviewStatements.conditionStatus,
+            type: professionalReviewStatements.type,
+          })
+          .from(professionalReviewStatements)
+          .where(
+            eq(
+              professionalReviewStatements.reviewRevisionId,
+              row.reviewRevisionId,
+            ),
           ),
-        ),
-    ]);
+        database
+          .select({
+            action: professionalReviewAcknowledgements.action,
+            attorneyName: user.name,
+            note: professionalReviewAcknowledgements.note,
+            occurredAt: professionalReviewAcknowledgements.occurredAt,
+          })
+          .from(professionalReviewAcknowledgements)
+          .innerJoin(
+            caseMemberships,
+            and(
+              eq(
+                caseMemberships.id,
+                professionalReviewAcknowledgements.attorneyCaseMembershipId,
+              ),
+              eq(
+                caseMemberships.caseId,
+                professionalReviewAcknowledgements.caseId,
+              ),
+            ),
+          )
+          .innerJoin(user, eq(user.id, caseMemberships.userId))
+          .where(
+            and(
+              eq(
+                professionalReviewAcknowledgements.reviewRevisionId,
+                row.reviewRevisionId,
+              ),
+              eq(professionalReviewAcknowledgements.action, "acknowledged"),
+            ),
+          )
+          .orderBy(asc(professionalReviewAcknowledgements.occurredAt)),
+      ],
+    );
     const evidence = [];
     for (const candidate of candidateEvidence) {
       if (
@@ -763,7 +936,13 @@ export async function listAuthorizedProfessionalReviews(
         type,
       })),
     });
-    authorized.push({ ...row, evidence, statementHash, statements });
+    authorized.push({
+      ...row,
+      acknowledgements,
+      evidence,
+      statementHash,
+      statements,
+    });
   }
   return authorized;
 }
@@ -859,6 +1038,7 @@ export async function recordAttorneyReviewAcknowledgement(
     professionalReviewId: string;
     reviewRevisionId: string;
     statementHash: string;
+    note?: string;
     userId: string;
   },
 ) {
@@ -958,6 +1138,7 @@ export async function recordAttorneyReviewAcknowledgement(
         action: input.action,
         attorneyCaseMembershipId: actor.caseMembershipId,
         caseId: input.caseId,
+        note: input.note?.trim(),
         professionalReviewId: input.professionalReviewId,
         reviewRevisionId: input.reviewRevisionId,
         statementHash: input.statementHash,

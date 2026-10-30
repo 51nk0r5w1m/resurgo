@@ -3,9 +3,11 @@ import {
   getDiscoveryState,
   listAuthorizedCaseActivity,
   listAuthorizedCaseMembers,
+  listAuthorizedCaseTasks,
   listAuthorizedDocumentRequests,
   listAuthorizedDocuments,
   listAuthorizedProfessionalReviews,
+  requireCaseAuthorization,
 } from "@resurgo/db";
 import {
   ArrowRight,
@@ -30,6 +32,11 @@ export default async function CaseOverviewPage({
   const session = await getAuth().api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
   const { caseId } = await params;
+  const authorization = await requireCaseAuthorization(getDatabase(), {
+    caseId,
+    operation: "read",
+    userId: session.user.id,
+  }).catch(() => notFound());
   const [
     caseRecord,
     discovery,
@@ -38,9 +45,12 @@ export default async function CaseOverviewPage({
     reviews,
     members,
     activity,
+    tasks,
   ] = await Promise.all([
     getAuthorizedCase(getDatabase(), { caseId, userId: session.user.id }),
-    getDiscoveryState(getDatabase(), { caseId, userId: session.user.id }),
+    authorization.role === "owner"
+      ? getDiscoveryState(getDatabase(), { caseId, userId: session.user.id })
+      : Promise.resolve(null),
     listAuthorizedDocuments(getDatabase(), { caseId, userId: session.user.id }),
     listAuthorizedDocumentRequests(getDatabase(), {
       caseId,
@@ -58,10 +68,14 @@ export default async function CaseOverviewPage({
       caseId,
       limit: 6,
       userId: session.user.id,
+    }).catch(() => []),
+    listAuthorizedCaseTasks(getDatabase(), {
+      caseId,
+      userId: session.user.id,
     }),
   ]).catch(() => notFound());
-  if (!caseRecord || !discovery) notFound();
-  const answers = Object.keys(discovery.answers).length;
+  if (!caseRecord) notFound();
+  const answers = Object.keys(discovery?.answers ?? {}).length;
   const openRequests = requests.filter(
     ({ status }) => status !== "completed" && status !== "cancelled",
   );
@@ -70,6 +84,9 @@ export default async function CaseOverviewPage({
   );
   const availableDocuments = documents.filter(
     ({ processing_status }) => processing_status === "available",
+  );
+  const openTasks = tasks.filter(
+    ({ status }) => status !== "completed" && status !== "cancelled",
   );
 
   return (
@@ -84,9 +101,11 @@ export default async function CaseOverviewPage({
           <CheckCircle2 aria-hidden="true" />
           <span>Discovery</span>
           <strong>
-            {discovery.session.status === "completed"
-              ? "Complete"
-              : `${answers} answers saved`}
+            {!discovery
+              ? "Client private"
+              : discovery.session.status === "completed"
+                ? "Complete"
+                : `${answers} answers saved`}
           </strong>
         </Link>
         <Link className="case-metric" href={`/cases/${caseId}/documents`}>
@@ -113,7 +132,7 @@ export default async function CaseOverviewPage({
       <div className="overview-grid">
         <section className="workspace-card next-step-card">
           <p className="eyebrow">Next action</p>
-          {discovery.session.status !== "completed" ? (
+          {discovery && discovery.session.status !== "completed" ? (
             <>
               <h2>Continue your discovery</h2>
               <p>
@@ -123,15 +142,19 @@ export default async function CaseOverviewPage({
                 Continue discovery <ArrowRight size={16} />
               </Link>
             </>
-          ) : openRequests.length > 0 ? (
+          ) : openTasks.length > 0 ? (
             <>
-              <h2>Review outstanding requests</h2>
-              <p>{openRequests[0]?.title}</p>
+              <h2>{openTasks[0]?.title}</h2>
+              <p>{openTasks[0]?.description}</p>
               <Link
                 className="text-action"
-                href={`/cases/${caseId}/documents#requests`}
+                href={
+                  openRequests.length > 0
+                    ? `/cases/${caseId}/documents#requests`
+                    : `/cases/${caseId}/reviews`
+                }
               >
-                Open requests <ArrowRight size={16} />
+                Continue this work <ArrowRight size={16} />
               </Link>
             </>
           ) : activeReviews.length > 0 ? (

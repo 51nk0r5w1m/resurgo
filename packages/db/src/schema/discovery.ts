@@ -127,6 +127,7 @@ export const discoveryOutputs = resurgoSchema.table(
       .notNull(),
   },
   (table) => [
+    unique("discovery_outputs_id_case_unique").on(table.id, table.caseId),
     unique("discovery_outputs_session_generation_code_unique").on(
       table.discoverySessionId,
       table.generation,
@@ -200,6 +201,7 @@ export const roadmapItems = resurgoSchema.table(
       () => recommendations.id,
       { onDelete: "restrict" },
     ),
+    sourceDiscoveryOutputId: uuid("source_discovery_output_id"),
     generation: integer("generation").notNull(),
     position: integer("position").notNull(),
     title: text("title").notNull(),
@@ -219,6 +221,11 @@ export const roadmapItems = resurgoSchema.table(
       columns: [table.recommendationId, table.caseId],
       foreignColumns: [recommendations.id, recommendations.caseId],
       name: "roadmap_items_recommendation_case_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.sourceDiscoveryOutputId, table.caseId],
+      foreignColumns: [discoveryOutputs.id, discoveryOutputs.caseId],
+      name: "roadmap_items_discovery_output_case_fk",
     }).onDelete("restrict"),
     index("roadmap_items_case_generation_idx").on(
       table.caseId,

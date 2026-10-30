@@ -7,6 +7,7 @@ export function ReviewAssignmentForm({
   caseId,
   documents,
   professionals,
+  reviewTriggers,
 }: {
   caseId: string;
   documents: Array<{
@@ -16,6 +17,7 @@ export function ReviewAssignmentForm({
     versionNumber: number;
   }>;
   professionals: Array<{ id: string; name: string; role: string }>;
+  reviewTriggers: Array<{ id: string; title: string }>;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -39,6 +41,19 @@ export function ReviewAssignmentForm({
           responsibleCaseMembershipId: form.get("membershipId"),
           reviewScope: form.get("reviewScope"),
           versionId: document.versionId,
+          sourceDiscoveryOutputId: form.get("sourceDiscoveryOutputId"),
+          settlement: {
+            equityBuyoutAmount: form.get("equityBuyoutAmount") || undefined,
+            existingMortgageResponsibility: form.get(
+              "existingMortgageResponsibility",
+            ),
+            financingAssumptions: form.get("financingAssumptions"),
+            propertyDisposition: form.get("propertyDisposition"),
+            proposedPathway: form.get("proposedPathway"),
+            proposedSettlementDeadline:
+              form.get("proposedSettlementDeadline") || undefined,
+            reviewStage: "feasibility_review",
+          },
         }),
       });
       if (!response.ok) throw new Error("assignment failed");
@@ -54,11 +69,16 @@ export function ReviewAssignmentForm({
       setPending(false);
     }
   }
-  if (!documents.length || !professionals.length) return null;
+  if (!documents.length || !professionals.length || !reviewTriggers.length)
+    return null;
   return (
     <section className="workspace-card collaboration-action-card">
-      <p className="eyebrow">Assign accountable review</p>
-      <h2>No consequential decision without visible context.</h2>
+      <p className="eyebrow">Settlement Feasibility Review</p>
+      <h2>Test the housing proposal against visible evidence.</h2>
+      <p>
+        This is a coordination review—not a preapproval, underwriting approval,
+        legal conclusion, or promise to close.
+      </p>
       <form className="review-assignment-form" onSubmit={submit}>
         <label>
           <span>Responsible professional</span>
@@ -67,6 +87,17 @@ export function ReviewAssignmentForm({
             {professionals.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name} · {item.role}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Discovery review trigger</span>
+          <select name="sourceDiscoveryOutputId" required>
+            <option value="">Choose an outstanding trigger</option>
+            {reviewTriggers.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.title}
               </option>
             ))}
           </select>
@@ -81,6 +112,47 @@ export function ReviewAssignmentForm({
               </option>
             ))}
           </select>
+        </label>
+        <label>
+          <span>Proposed property disposition</span>
+          <select name="propertyDisposition" required>
+            <option value="retain_by_client">
+              Client proposes retaining the property
+            </option>
+            <option value="retain_by_spouse">
+              Spouse proposes retaining the property
+            </option>
+            <option value="sell">Sell the property</option>
+            <option value="undecided">Undecided</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Proposed financing pathway</span>
+          <select name="proposedPathway" required>
+            <option value="refinance">Refinance</option>
+            <option value="assumption">Loan assumption</option>
+            <option value="sale">Sale</option>
+            <option value="payoff">Payoff</option>
+            <option value="undecided">Undecided</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Existing mortgage responsibility</span>
+          <textarea name="existingMortgageResponsibility" required rows={3} />
+        </label>
+        <label>
+          <span>Financing assumptions to test</span>
+          <textarea name="financingAssumptions" required rows={3} />
+        </label>
+        <label>
+          <span>Equity buyout amount, if proposed</span>
+          <input min="0" name="equityBuyoutAmount" step="0.01" type="number" />
+        </label>
+        <label>
+          <span>Proposed settlement deadline</span>
+          <input name="proposedSettlementDeadline" type="date" />
         </label>
         <label>
           <span>Decision context</span>

@@ -53,6 +53,14 @@ export const resourceType = resurgoSchema.enum("resource_type", [
   "intake_response",
   "roadmap_item",
   "coordination_note",
+  "case_task",
+]);
+
+export const caseTaskStatus = resurgoSchema.enum("case_task_status", [
+  "open",
+  "blocked",
+  "completed",
+  "cancelled",
 ]);
 
 export const resourceClassification = resurgoSchema.enum(

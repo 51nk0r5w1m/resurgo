@@ -15,6 +15,7 @@ import {
 import { createCaseWithOwner } from "./domain/cases";
 import {
   authorizeDocumentDisclosure,
+  authorizeReviewDisclosure,
   revokeDocumentDisclosure,
 } from "./domain/disclosures";
 import {
@@ -48,7 +49,6 @@ import {
   appendProfessionalReviewRevision,
   computeProfessionalReviewStatementHash,
   createProfessionalReview,
-  grantProfessionalReviewAccess,
   listAuthorizedProfessionalReviews,
   recordAttorneyReviewAcknowledgement,
 } from "./domain/reviews";
@@ -1176,6 +1176,17 @@ describe("immutable document and professional review foundations", () => {
         viewConsentId: lenderView.id,
       },
       reviewScope: "Identify factual mortgage conditions for attorney review.",
+      settlement: {
+        equityBuyoutAmount: "125000.00",
+        existingMortgageResponsibility:
+          "Both synthetic borrowers remain obligated on the current loan.",
+        financingAssumptions:
+          "The client proposes a refinance before the synthetic deadline.",
+        propertyDisposition: "retain_by_client",
+        proposedPathway: "refinance",
+        proposedSettlementDeadline: new Date("2027-06-30T12:00:00.000Z"),
+        reviewStage: "feasibility_review",
+      },
       subjectType: "mortgage_property",
       userId: owner.id,
     });
@@ -1237,6 +1248,21 @@ describe("immutable document and professional review foundations", () => {
       ],
       professionalReviewId: review.review.id,
       reviewScope: "Record factual findings without an eligibility decision.",
+      settlement: {
+        equityBuyoutAmount: "125000.00",
+        existingMortgageResponsibility:
+          "Both synthetic borrowers remain obligated until a closing or payoff.",
+        financingAssumptions:
+          "Income and appraisal evidence remain subject to professional review.",
+        lenderFindings:
+          "The proposed path requires documentation review; no approval is represented.",
+        outstandingConditions:
+          "Current appraisal, income documentation, and final settlement terms.",
+        propertyDisposition: "retain_by_client",
+        proposedPathway: "refinance",
+        proposedSettlementDeadline: new Date("2027-06-30T12:00:00.000Z"),
+        reviewStage: "feasibility_review",
+      },
       statements: [
         {
           body: "Qualified professional review remains required for any decision.",
@@ -1268,26 +1294,22 @@ describe("immutable document and professional review foundations", () => {
         userId: specialist.id,
       }),
     ).rejects.toThrow("Duplicate professional review evidence reference");
-    const [attorneyConsent] = await database
-      .insert(schema.disclosureConsents)
-      .values({
-        caseId: clientCase.id,
-        classification: "financial",
-        grantorCaseMembershipId: ownerMembership.id,
-        operation: "view",
-        purpose: "Attorney acknowledgement of specialist findings",
-        recipientCaseMembershipId: attorneyMembership.id,
-        termsHash: "e".repeat(64),
-      })
-      .returning();
-    if (!attorneyConsent) throw new Error("Attorney consent missing");
-    await grantProfessionalReviewAccess(database, {
+    const attorneyDisclosure = await authorizeReviewDisclosure(database, {
       caseId: clientCase.id,
-      consentId: attorneyConsent.id,
-      granteeCaseMembershipId: attorneyMembership.id,
-      operation: "view",
+      purpose: "Attorney acknowledgement of specialist findings",
       professionalReviewId: review.review.id,
+      recipientCaseMembershipId: attorneyMembership.id,
       userId: owner.id,
+    });
+    const attorneyReviews = await listAuthorizedProfessionalReviews(database, {
+      caseId: clientCase.id,
+      userId: attorney.id,
+    });
+    expect(attorneyReviews[0]).toMatchObject({
+      evidence: [],
+      outstandingConditions:
+        "Current appraisal, income documentation, and final settlement terms.",
+      reviewStage: "feasibility_review",
     });
     await expect(
       recordAttorneyReviewAcknowledgement(database, {
@@ -1367,7 +1389,7 @@ describe("immutable document and professional review foundations", () => {
     await database
       .update(schema.disclosureConsents)
       .set({ revokedAt: new Date(), status: "revoked" })
-      .where(eq(schema.disclosureConsents.id, attorneyConsent.id));
+      .where(eq(schema.disclosureConsents.id, attorneyDisclosure.consent.id));
     await expect(
       listAuthorizedProfessionalReviews(database, {
         caseId: clientCase.id,

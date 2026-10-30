@@ -4,10 +4,17 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "../schema";
 import {
   auditEvents,
+  caseResources,
+  caseTaskEvents,
+  caseTasks,
   discoveryAnswers,
   discoveryOutputs,
   discoverySessions,
+  documentRequestEvents,
+  documentRequests,
   recommendations,
+  resourceGrants,
+  reviewPrerequisites,
   roadmapItems,
 } from "../schema";
 import {
@@ -28,6 +35,7 @@ import {
 import { evaluateDiscoveryRules } from "./discovery-rules";
 
 type Database = NodePgDatabase<typeof schema>;
+type Classification = (typeof schema.resourceClassification.enumValues)[number];
 
 export {
   applicableDiscoveryQuestions,
@@ -299,6 +307,7 @@ function roadmapFor(
 ) {
   const serviceItems = generated.recommendations.map((item) => ({
     description: item.explanation,
+    outputCode: undefined,
     recommendationId: createdRecommendations.find(
       ({ service }) => service === item.service,
     )?.id,
@@ -309,6 +318,7 @@ function roadmapFor(
     .map((item) => ({
       description: `${item.explanation} Triggered by ${item.ruleId}.`,
       recommendationId: undefined,
+      outputCode: item.code,
       title: `Gather: ${item.title}`,
     }));
   const reviewItems = generated.outputs
@@ -316,6 +326,7 @@ function roadmapFor(
     .map((item) => ({
       description: `${item.explanation} Triggered by ${item.ruleId}.`,
       recommendationId: undefined,
+      outputCode: item.code,
       title: `Resolve: ${item.title}`,
     }));
   return [...serviceItems, ...documentItems, ...reviewItems];
@@ -326,7 +337,7 @@ export async function completeDiscovery(
   input: { caseId: string; userId: string },
 ) {
   return database.transaction(async (transaction) => {
-    await requireCaseAuthorization(transaction, {
+    const owner = await requireCaseAuthorization(transaction, {
       ...input,
       operation: "manage",
     });
@@ -375,21 +386,24 @@ export async function completeDiscovery(
         })),
       )
       .returning({ id: recommendations.id, service: recommendations.service });
-    if (generated.outputs.length > 0) {
-      await transaction.insert(discoveryOutputs).values(
-        generated.outputs.map((item) => ({
-          caseId: input.caseId,
-          classification: item.classification,
-          code: item.code,
-          discoverySessionId: session.id,
-          explanation: item.explanation,
-          generation,
-          ruleId: item.ruleId,
-          title: item.title,
-          type: item.type,
-        })),
-      );
-    }
+    const createdOutputs = generated.outputs.length
+      ? await transaction
+          .insert(discoveryOutputs)
+          .values(
+            generated.outputs.map((item) => ({
+              caseId: input.caseId,
+              classification: item.classification,
+              code: item.code,
+              discoverySessionId: session.id,
+              explanation: item.explanation,
+              generation,
+              ruleId: item.ruleId,
+              title: item.title,
+              type: item.type,
+            })),
+          )
+          .returning()
+      : [];
     const roadmap = roadmapFor(generated, createdRecommendations);
     if (roadmap.length > 0) {
       await transaction.insert(roadmapItems).values(
@@ -399,10 +413,120 @@ export async function completeDiscovery(
           generation,
           position: index + 1,
           recommendationId: item.recommendationId,
+          sourceDiscoveryOutputId: item.outputCode
+            ? createdOutputs.find(({ code }) => code === item.outputCode)?.id
+            : undefined,
           status: index === 0 ? ("ready" as const) : ("upcoming" as const),
           title: item.title,
         })),
       );
+    }
+    for (const output of createdOutputs) {
+      const classification = output.classification as Classification;
+      const responsibleRole =
+        output.type === "document_request"
+          ? "client"
+          : /mortgage|home|housing|refinance|deadline/u.test(output.code)
+            ? "lender"
+            : /business|asset|debt|financial/u.test(output.code)
+              ? "accountant"
+              : "attorney";
+      const [taskResource] = await transaction
+        .insert(caseResources)
+        .values({
+          caseId: input.caseId,
+          classification,
+          ownerCaseMembershipId: owner.caseMembershipId,
+          type: "case_task",
+        })
+        .returning();
+      if (!taskResource)
+        throw new Error("Discovery task resource creation failed");
+      const [task] = await transaction
+        .insert(caseTasks)
+        .values({
+          caseId: input.caseId,
+          caseResourceId: taskResource.id,
+          classification,
+          description: output.explanation,
+          responsibleRole,
+          sourceDiscoveryOutputId: output.id,
+          title: output.title,
+        })
+        .returning();
+      if (!task) throw new Error("Discovery task creation failed");
+      await transaction.insert(caseTaskEvents).values({
+        actorCaseMembershipId: owner.caseMembershipId,
+        caseId: input.caseId,
+        caseTaskId: task.id,
+        status: "open",
+      });
+      await transaction.insert(resourceGrants).values(
+        (["view", "download", "share", "contribute"] as const).map(
+          (operation) => ({
+            basis: "case_owner" as const,
+            caseId: input.caseId,
+            classification,
+            granteeCaseMembershipId: owner.caseMembershipId,
+            operation,
+            resourceId: taskResource.id,
+          }),
+        ),
+      );
+      if (output.type === "document_request") {
+        const [requestResource] = await transaction
+          .insert(caseResources)
+          .values({
+            caseId: input.caseId,
+            classification,
+            ownerCaseMembershipId: owner.caseMembershipId,
+            type: "document_request",
+          })
+          .returning();
+        if (!requestResource)
+          throw new Error("Suggested request resource creation failed");
+        const [request] = await transaction
+          .insert(documentRequests)
+          .values({
+            caseId: input.caseId,
+            caseResourceId: requestResource.id,
+            classification,
+            description: output.explanation,
+            requestedByCaseMembershipId: owner.caseMembershipId,
+            sourceDiscoveryOutputId: output.id,
+            title: output.title,
+          })
+          .returning();
+        if (!request)
+          throw new Error("Suggested document request creation failed");
+        await transaction.insert(documentRequestEvents).values({
+          actorCaseMembershipId: owner.caseMembershipId,
+          caseId: input.caseId,
+          documentRequestId: request.id,
+          status: "requested",
+        });
+        await transaction.insert(resourceGrants).values(
+          (["view", "download", "share", "contribute"] as const).map(
+            (operation) => ({
+              basis: "case_owner" as const,
+              caseId: input.caseId,
+              classification,
+              granteeCaseMembershipId: owner.caseMembershipId,
+              operation,
+              resourceId: requestResource.id,
+            }),
+          ),
+        );
+      } else {
+        await transaction.insert(reviewPrerequisites).values({
+          caseId: input.caseId,
+          code: output.code,
+          description: output.explanation,
+          responsibleRole,
+          sourceDiscoveryOutputId: output.id,
+          title: output.title,
+        });
+      }
     }
     const completedAt = new Date();
     await transaction

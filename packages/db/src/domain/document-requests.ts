@@ -4,6 +4,8 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "../schema";
 import {
   auditEvents,
+  caseTaskEvents,
+  caseTasks,
   caseMemberships,
   caseResources,
   disclosureConsents,
@@ -12,6 +14,7 @@ import {
   documents,
   documentVersions,
   resourceGrants,
+  roadmapItems,
 } from "../schema";
 import {
   AuthorizationDeniedError,
@@ -322,6 +325,40 @@ export async function transitionDocumentRequest(
         resourceType: "document_request",
       }),
     );
+    if (input.status === "completed" && request.sourceDiscoveryOutputId) {
+      const tasks = await transaction
+        .select({ id: caseTasks.id })
+        .from(caseTasks)
+        .where(
+          and(
+            eq(caseTasks.caseId, input.caseId),
+            eq(
+              caseTasks.sourceDiscoveryOutputId,
+              request.sourceDiscoveryOutputId,
+            ),
+          ),
+        );
+      for (const task of tasks) {
+        await transaction.insert(caseTaskEvents).values({
+          actorCaseMembershipId: actor.caseMembershipId,
+          caseId: input.caseId,
+          caseTaskId: task.id,
+          status: "completed",
+        });
+      }
+      await transaction
+        .update(roadmapItems)
+        .set({ status: "completed" })
+        .where(
+          and(
+            eq(roadmapItems.caseId, input.caseId),
+            eq(
+              roadmapItems.sourceDiscoveryOutputId,
+              request.sourceDiscoveryOutputId,
+            ),
+          ),
+        );
+    }
     return event;
   });
 }

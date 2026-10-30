@@ -17,6 +17,34 @@ const bodySchema = z.object({
   responsibleCaseMembershipId: z.uuid(),
   reviewScope: z.string().trim().min(3).max(4000),
   versionId: z.uuid(),
+  sourceDiscoveryOutputId: z.uuid().optional(),
+  settlement: z
+    .object({
+      equityBuyoutAmount: z
+        .string()
+        .regex(/^\d+(\.\d{1,2})?$/u)
+        .optional(),
+      existingMortgageResponsibility: z.string().trim().min(3).max(2000),
+      financingAssumptions: z.string().trim().min(3).max(4000),
+      propertyDisposition: z.enum([
+        "retain_by_client",
+        "retain_by_spouse",
+        "sell",
+        "undecided",
+        "other",
+      ]),
+      proposedPathway: z.enum([
+        "refinance",
+        "assumption",
+        "sale",
+        "payoff",
+        "other",
+        "undecided",
+      ]),
+      proposedSettlementDeadline: z.coerce.date().optional(),
+      reviewStage: z.literal("feasibility_review"),
+    })
+    .optional(),
 });
 
 const revisionSchema = z.object({
@@ -54,6 +82,35 @@ const revisionSchema = z.object({
     "completed",
     "withdrawn",
   ]),
+  settlement: z
+    .object({
+      equityBuyoutAmount: z
+        .string()
+        .regex(/^\d+(\.\d{1,2})?$/u)
+        .optional(),
+      existingMortgageResponsibility: z.string().trim().min(3).max(2000),
+      financingAssumptions: z.string().trim().min(3).max(4000),
+      lenderFindings: z.string().trim().min(3).max(8000).optional(),
+      outstandingConditions: z.string().trim().min(3).max(8000).optional(),
+      propertyDisposition: z.enum([
+        "retain_by_client",
+        "retain_by_spouse",
+        "sell",
+        "undecided",
+        "other",
+      ]),
+      proposedPathway: z.enum([
+        "refinance",
+        "assumption",
+        "sale",
+        "payoff",
+        "other",
+        "undecided",
+      ]),
+      proposedSettlementDeadline: z.coerce.date().optional(),
+      reviewStage: z.literal("feasibility_review"),
+    })
+    .optional(),
 });
 
 const acknowledgementSchema = z.object({
@@ -61,6 +118,7 @@ const acknowledgementSchema = z.object({
   professionalReviewId: z.uuid(),
   reviewRevisionId: z.uuid(),
   statementHash: z.string().regex(/^[0-9a-f]{64}$/u),
+  note: z.string().trim().min(3).max(4000).optional(),
 });
 
 export async function POST(
@@ -93,6 +151,25 @@ export async function POST(
       recipientCaseMembershipId: parsed.data.responsibleCaseMembershipId,
       userId: session.user.id,
     });
+    const settlement = parsed.data.settlement
+      ? {
+          existingMortgageResponsibility:
+            parsed.data.settlement.existingMortgageResponsibility,
+          financingAssumptions: parsed.data.settlement.financingAssumptions,
+          propertyDisposition: parsed.data.settlement.propertyDisposition,
+          proposedPathway: parsed.data.settlement.proposedPathway,
+          reviewStage: parsed.data.settlement.reviewStage,
+          ...(parsed.data.settlement.equityBuyoutAmount
+            ? { equityBuyoutAmount: parsed.data.settlement.equityBuyoutAmount }
+            : {}),
+          ...(parsed.data.settlement.proposedSettlementDeadline
+            ? {
+                proposedSettlementDeadline:
+                  parsed.data.settlement.proposedSettlementDeadline,
+              }
+            : {}),
+        }
+      : undefined;
     const review = await createProfessionalReview(getDatabase(), {
       caseId,
       classification: document.classification,
@@ -110,8 +187,14 @@ export async function POST(
         viewConsentId: consents.view,
       },
       reviewScope: parsed.data.reviewScope,
+      ...(settlement ? { settlement } : {}),
+      ...(parsed.data.sourceDiscoveryOutputId
+        ? { sourceDiscoveryOutputId: parsed.data.sourceDiscoveryOutputId }
+        : {}),
       subjectResourceId: document.resource_id,
-      subjectType: "document_set",
+      subjectType: parsed.data.settlement
+        ? "mortgage_property"
+        : "document_set",
       userId: session.user.id,
     });
     return Response.json(
@@ -141,17 +224,48 @@ export async function PATCH(
     return Response.json({ error: "Invalid request" }, { status: 400 });
   }
   try {
+    const {
+      settlement: parsedSettlement,
+      statements: parsedStatements,
+      ...revisionData
+    } = parsed.data;
+    const settlement = parsedSettlement
+      ? {
+          existingMortgageResponsibility:
+            parsedSettlement.existingMortgageResponsibility,
+          financingAssumptions: parsedSettlement.financingAssumptions,
+          propertyDisposition: parsedSettlement.propertyDisposition,
+          proposedPathway: parsedSettlement.proposedPathway,
+          reviewStage: parsedSettlement.reviewStage,
+          ...(parsedSettlement.equityBuyoutAmount
+            ? { equityBuyoutAmount: parsedSettlement.equityBuyoutAmount }
+            : {}),
+          ...(parsedSettlement.lenderFindings
+            ? { lenderFindings: parsedSettlement.lenderFindings }
+            : {}),
+          ...(parsedSettlement.outstandingConditions
+            ? {
+                outstandingConditions: parsedSettlement.outstandingConditions,
+              }
+            : {}),
+          ...(parsedSettlement.proposedSettlementDeadline
+            ? {
+                proposedSettlementDeadline:
+                  parsedSettlement.proposedSettlementDeadline,
+              }
+            : {}),
+        }
+      : undefined;
     const revision = await appendProfessionalReviewRevision(getDatabase(), {
       caseId,
       userId: session.user.id,
-      ...parsed.data,
-      statements: parsed.data.statements.map(
-        ({ body, conditionStatus, type }) => ({
-          body,
-          type,
-          ...(conditionStatus ? { conditionStatus } : {}),
-        }),
-      ),
+      ...revisionData,
+      ...(settlement ? { settlement } : {}),
+      statements: parsedStatements.map(({ body, conditionStatus, type }) => ({
+        body,
+        type,
+        ...(conditionStatus ? { conditionStatus } : {}),
+      })),
     });
     return Response.json(
       { revisionId: revision.id },
@@ -183,7 +297,11 @@ export async function PUT(
     await recordAttorneyReviewAcknowledgement(getDatabase(), {
       caseId,
       userId: session.user.id,
-      ...parsed.data,
+      action: parsed.data.action,
+      professionalReviewId: parsed.data.professionalReviewId,
+      reviewRevisionId: parsed.data.reviewRevisionId,
+      statementHash: parsed.data.statementHash,
+      ...(parsed.data.note ? { note: parsed.data.note } : {}),
     });
     return Response.json(
       { acknowledged: parsed.data.action === "acknowledged" },

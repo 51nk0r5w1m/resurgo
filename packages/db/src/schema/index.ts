@@ -6,4 +6,5 @@ export * from "./documents";
 export * from "./enums";
 export * from "./resources";
 export * from "./reviews";
+export * from "./workflows";
 export { resurgoSchema, systemMetadata } from "./system";

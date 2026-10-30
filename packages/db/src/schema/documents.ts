@@ -15,6 +15,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { caseMemberships, cases } from "./collaboration";
+import { discoveryOutputs } from "./discovery";
 import {
   documentConfidentiality,
   documentContributorRole,
@@ -368,6 +369,7 @@ export const documentRequests = resurgoSchema.table(
       .notNull()
       .references(() => cases.id, { onDelete: "restrict" }),
     caseResourceId: uuid("case_resource_id").notNull(),
+    sourceDiscoveryOutputId: uuid("source_discovery_output_id"),
     requestedByCaseMembershipId: uuid(
       "requested_by_case_membership_id",
     ).notNull(),
@@ -394,6 +396,11 @@ export const documentRequests = resurgoSchema.table(
       columns: [table.caseId, table.caseResourceId],
       foreignColumns: [caseResources.caseId, caseResources.id],
       name: "document_requests_case_resource_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.sourceDiscoveryOutputId, table.caseId],
+      foreignColumns: [discoveryOutputs.id, discoveryOutputs.caseId],
+      name: "document_requests_discovery_output_case_fk",
     }).onDelete("restrict"),
     foreignKey({
       columns: [table.caseId, table.requestedByCaseMembershipId],

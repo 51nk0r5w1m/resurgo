@@ -10,6 +10,7 @@ import {
   caseResources,
   disclosureConsents,
   documents,
+  professionalReviews,
   resourceGrants,
   user,
 } from "../schema";
@@ -142,6 +143,107 @@ export async function authorizeDocumentDisclosure(
       }),
     );
     return { consents, grants };
+  });
+}
+
+export async function authorizeReviewDisclosure(
+  database: Database,
+  input: {
+    caseId: string;
+    professionalReviewId: string;
+    purpose: string;
+    recipientCaseMembershipId: string;
+    userId: string;
+  },
+) {
+  return database.transaction(async (transaction) => {
+    const owner = await requireCaseAuthorization(transaction, {
+      caseId: input.caseId,
+      operation: "manage",
+      userId: input.userId,
+    });
+    const [recipient] = await transaction
+      .select({ role: caseMemberships.role, userId: caseMemberships.userId })
+      .from(caseMemberships)
+      .where(
+        and(
+          eq(caseMemberships.caseId, input.caseId),
+          eq(caseMemberships.id, input.recipientCaseMembershipId),
+          eq(caseMemberships.status, "active"),
+          eq(caseMemberships.role, "attorney"),
+        ),
+      )
+      .limit(1);
+    if (!recipient || !input.purpose.trim())
+      throw new AuthorizationDeniedError();
+    await requireCaseAuthorization(transaction, {
+      caseId: input.caseId,
+      operation: "read",
+      userId: recipient.userId,
+    });
+    const [review] = await transaction
+      .select({
+        classification: caseResources.classification,
+        resourceId: professionalReviews.caseResourceId,
+      })
+      .from(professionalReviews)
+      .innerJoin(
+        caseResources,
+        eq(caseResources.id, professionalReviews.caseResourceId),
+      )
+      .where(
+        and(
+          eq(professionalReviews.caseId, input.caseId),
+          eq(professionalReviews.id, input.professionalReviewId),
+        ),
+      )
+      .limit(1);
+    if (!review) throw new AuthorizationDeniedError();
+    const [consent] = await transaction
+      .insert(disclosureConsents)
+      .values({
+        caseId: input.caseId,
+        classification: review.classification,
+        grantorCaseMembershipId: owner.caseMembershipId,
+        operation: "view",
+        purpose: input.purpose.trim(),
+        recipientCaseMembershipId: input.recipientCaseMembershipId,
+        termsHash: createHash("sha256")
+          .update(
+            JSON.stringify({
+              professionalReviewId: input.professionalReviewId,
+              purpose: input.purpose.trim(),
+              recipientCaseMembershipId: input.recipientCaseMembershipId,
+            }),
+          )
+          .digest("hex"),
+      })
+      .returning();
+    if (!consent) throw new Error("Review consent creation failed");
+    const [grant] = await transaction
+      .insert(resourceGrants)
+      .values({
+        basis: "explicit_consent",
+        caseId: input.caseId,
+        classification: review.classification,
+        granteeCaseMembershipId: input.recipientCaseMembershipId,
+        operation: "view",
+        resourceId: review.resourceId,
+        sourceConsentId: consent.id,
+      })
+      .returning();
+    await transaction.insert(auditEvents).values(
+      buildAuditEvent({
+        action: "professional_review.disclosure.authorized",
+        actorType: "user",
+        actorUserId: input.userId,
+        caseId: input.caseId,
+        outcome: "success",
+        resourceId: input.professionalReviewId,
+        resourceType: "professional_review",
+      }),
+    );
+    return { consent, grant };
   });
 }
 

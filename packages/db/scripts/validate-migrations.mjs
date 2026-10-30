@@ -43,6 +43,8 @@ try {
     ["resurgo", "audit_events"],
     ["resurgo", "case_memberships"],
     ["resurgo", "case_resources"],
+    ["resurgo", "case_task_events"],
+    ["resurgo", "case_tasks"],
     ["resurgo", "cases"],
     ["resurgo", "disclosure_consents"],
     ["resurgo", "discovery_answers"],
@@ -67,7 +69,9 @@ try {
     ["resurgo", "professional_reviews"],
     ["resurgo", "recommendations"],
     ["resurgo", "resource_grants"],
+    ["resurgo", "review_prerequisites"],
     ["resurgo", "roadmap_items"],
+    ["resurgo", "settlement_feasibility_revisions"],
     ["resurgo", "system_metadata"],
   ];
   const relations = await pool.query(`

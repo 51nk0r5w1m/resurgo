@@ -20,6 +20,7 @@ export function ProfessionalReviewAction({
   reviewScope,
   statementHash,
   status,
+  settlement,
 }: {
   canAcknowledge: boolean;
   canContribute: boolean;
@@ -31,6 +32,17 @@ export function ProfessionalReviewAction({
   reviewScope: string;
   statementHash: string;
   status: string;
+  settlement: {
+    equityBuyoutAmount: string | null;
+    existingMortgageResponsibility: string;
+    financingAssumptions: string;
+    lenderFindings: string | null;
+    outstandingConditions: string | null;
+    propertyDisposition: string;
+    proposedPathway: string;
+    proposedSettlementDeadline: string | null;
+    reviewStage: string;
+  } | null;
 }) {
   const router = useRouter();
   const [message, setMessage] = useState("");
@@ -49,6 +61,26 @@ export function ProfessionalReviewAction({
           evidence,
           professionalReviewId,
           reviewScope,
+          ...(settlement
+            ? {
+                settlement: {
+                  equityBuyoutAmount:
+                    form.get("equityBuyoutAmount") || undefined,
+                  existingMortgageResponsibility: form.get(
+                    "existingMortgageResponsibility",
+                  ),
+                  financingAssumptions: form.get("financingAssumptions"),
+                  lenderFindings: form.get("lenderFindings") || undefined,
+                  outstandingConditions:
+                    form.get("outstandingConditions") || undefined,
+                  propertyDisposition: form.get("propertyDisposition"),
+                  proposedPathway: form.get("proposedPathway"),
+                  proposedSettlementDeadline:
+                    form.get("proposedSettlementDeadline") || undefined,
+                  reviewStage: "feasibility_review",
+                },
+              }
+            : {}),
           statements: form.get("body")
             ? [
                 {
@@ -71,7 +103,9 @@ export function ProfessionalReviewAction({
     }
   }
 
-  async function acknowledge() {
+  async function acknowledge(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
     setPending(true);
     try {
       const response = await fetch(`/api/cases/${caseId}/reviews`, {
@@ -79,6 +113,7 @@ export function ProfessionalReviewAction({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           action: "acknowledged",
+          note: form.get("acknowledgementNote"),
           professionalReviewId,
           reviewRevisionId,
           statementHash,
@@ -119,6 +154,100 @@ export function ProfessionalReviewAction({
             <span>Finding, condition, or question</span>
             <textarea name="body" rows={3} />
           </label>
+          {settlement && (
+            <fieldset className="settlement-review-fields">
+              <legend>Settlement feasibility details</legend>
+              <p>
+                This records a financing feasibility review. It is not a
+                preapproval, underwriting approval, or commitment to close.
+              </p>
+              <label>
+                <span>Proposed property disposition</span>
+                <select
+                  defaultValue={settlement.propertyDisposition}
+                  name="propertyDisposition"
+                  required
+                >
+                  <option value="retain_by_client">
+                    Client retains property
+                  </option>
+                  <option value="retain_by_spouse">
+                    Spouse retains property
+                  </option>
+                  <option value="sell">Sell property</option>
+                  <option value="undecided">Undecided</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+              <label>
+                <span>Proposed financing pathway</span>
+                <select
+                  defaultValue={settlement.proposedPathway}
+                  name="proposedPathway"
+                  required
+                >
+                  <option value="refinance">Refinance</option>
+                  <option value="assumption">Loan assumption</option>
+                  <option value="sale">Sale</option>
+                  <option value="payoff">Payoff</option>
+                  <option value="undecided">Undecided</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+              <label>
+                <span>Existing mortgage responsibility</span>
+                <textarea
+                  defaultValue={settlement.existingMortgageResponsibility}
+                  name="existingMortgageResponsibility"
+                  required
+                  rows={2}
+                />
+              </label>
+              <label>
+                <span>Financing assumptions</span>
+                <textarea
+                  defaultValue={settlement.financingAssumptions}
+                  name="financingAssumptions"
+                  required
+                  rows={2}
+                />
+              </label>
+              <label>
+                <span>Equity buyout amount, if proposed</span>
+                <input
+                  defaultValue={settlement.equityBuyoutAmount ?? ""}
+                  inputMode="decimal"
+                  name="equityBuyoutAmount"
+                />
+              </label>
+              <label>
+                <span>Proposed settlement deadline</span>
+                <input
+                  defaultValue={
+                    settlement.proposedSettlementDeadline?.slice(0, 10) ?? ""
+                  }
+                  name="proposedSettlementDeadline"
+                  type="date"
+                />
+              </label>
+              <label>
+                <span>Lender findings</span>
+                <textarea
+                  defaultValue={settlement.lenderFindings ?? ""}
+                  name="lenderFindings"
+                  rows={3}
+                />
+              </label>
+              <label>
+                <span>Outstanding financing conditions</span>
+                <textarea
+                  defaultValue={settlement.outstandingConditions ?? ""}
+                  name="outstandingConditions"
+                  rows={3}
+                />
+              </label>
+            </fieldset>
+          )}
           <label>
             <span>Statement type</span>
             <select name="type">
@@ -146,14 +275,20 @@ export function ProfessionalReviewAction({
         </form>
       )}
       {canAcknowledge && status === "completed" && (
-        <button
-          className="button button-secondary"
-          disabled={pending}
-          onClick={acknowledge}
-          type="button"
-        >
-          Acknowledge this exact review
-        </button>
+        <form className="review-acknowledgement-form" onSubmit={acknowledge}>
+          <label>
+            <span>Attorney context for the client</span>
+            <textarea
+              name="acknowledgementNote"
+              placeholder="Record how these conditions affect settlement language or timing."
+              required
+              rows={3}
+            />
+          </label>
+          <button className="button button-secondary" disabled={pending}>
+            Acknowledge this exact review
+          </button>
+        </form>
       )}
       <p aria-live="polite" className="form-message">
         {message}

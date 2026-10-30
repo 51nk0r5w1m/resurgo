@@ -4,6 +4,7 @@ import {
   listAuthorizedDocumentRequests,
   listAuthorizedDocuments,
   listAuthorizedProfessionalReviews,
+  requireCaseAuthorization,
 } from "@resurgo/db";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
@@ -25,9 +26,15 @@ export default async function DocumentsPage({
   const session = await getAuth().api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
   const { caseId } = await params;
+  let authorization;
   try {
     await getAuthorizedCase(getDatabase(), {
       caseId,
+      userId: session.user.id,
+    });
+    authorization = await requireCaseAuthorization(getDatabase(), {
+      caseId,
+      operation: "read",
       userId: session.user.id,
     });
   } catch {
@@ -74,18 +81,20 @@ export default async function DocumentsPage({
           </div>
           <DocumentLibrary caseId={caseId} documents={documents} />
         </section>
-        <section
-          aria-label="Upload document"
-          className="document-panel upload-panel"
-        >
-          <p className="eyebrow">Add documents</p>
-          <h2>Upload securely</h2>
-          <p>
-            Originals are retained as immutable versions. A replacement creates
-            a new version and never overwrites the prior file.
-          </p>
-          <DocumentUploadForm caseId={caseId} />
-        </section>
+        {authorization.role === "owner" && (
+          <section
+            aria-label="Upload document"
+            className="document-panel upload-panel"
+          >
+            <p className="eyebrow">Add documents</p>
+            <h2>Upload securely</h2>
+            <p>
+              Originals are retained as immutable versions. A replacement
+              creates a new version and never overwrites the prior file.
+            </p>
+            <DocumentUploadForm caseId={caseId} />
+          </section>
+        )}
         <section
           aria-label="Document requests"
           className="document-panel request-panel"
@@ -93,7 +102,9 @@ export default async function DocumentsPage({
         >
           <p className="eyebrow">Document requests</p>
           <h2>Track what is still needed</h2>
-          <DocumentRequestForm caseId={caseId} />
+          {authorization.role === "owner" && (
+            <DocumentRequestForm caseId={caseId} />
+          )}
           {documentRequests.length === 0 ? (
             <p>No document requests are open for this case.</p>
           ) : (
