@@ -26,7 +26,8 @@ export function PdfDocumentViewer({
   const [document, setDocument] = useState<PDFDocumentProxy>();
   const [page, setPage] = useState(1);
   const [scale, setScale] = useState(1.15);
-  const [error, setError] = useState("");
+  const [failure, setFailure] = useState<{ key: string; message: string }>();
+  const renderKey = `${source}:${page}:${scale}`;
   useEffect(() => {
     const task = getDocument({ url: source, withCredentials: true });
     task.promise
@@ -34,7 +35,12 @@ export function PdfDocumentViewer({
         setDocument(pdf);
         setPage(1);
       })
-      .catch(() => setError("The authorized PDF preview could not be opened."));
+      .catch(() =>
+        setFailure({
+          key: source,
+          message: "The authorized PDF preview could not be opened.",
+        }),
+      );
     return () => {
       void task.destroy();
     };
@@ -42,21 +48,35 @@ export function PdfDocumentViewer({
   useEffect(() => {
     if (!document || !canvasRef.current) return;
     let active = true;
-    void document.getPage(page).then(async (pdfPage) => {
-      if (!active || !canvasRef.current) return;
-      const viewport = pdfPage.getViewport({ scale });
-      const canvas = canvasRef.current;
-      const context = canvas.getContext("2d");
-      if (!context) return;
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      await pdfPage.render({ canvas, canvasContext: context, viewport })
-        .promise;
-    });
+    const currentRenderKey = `${source}:${page}:${scale}`;
+    void document
+      .getPage(page)
+      .then(async (pdfPage) => {
+        if (!active || !canvasRef.current) return;
+        const viewport = pdfPage.getViewport({ scale });
+        const canvas = canvasRef.current;
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Canvas context unavailable");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        await pdfPage.render({ canvas, canvasContext: context, viewport })
+          .promise;
+      })
+      .catch(() => {
+        if (active)
+          setFailure({
+            key: currentRenderKey,
+            message: "This PDF page could not be rendered.",
+          });
+      });
     return () => {
       active = false;
     };
-  }, [document, page, scale]);
+  }, [document, page, scale, source]);
+  const error =
+    failure?.key === source || failure?.key === renderKey
+      ? failure.message
+      : "";
   if (error)
     return (
       <div className="viewer-error" role="alert">

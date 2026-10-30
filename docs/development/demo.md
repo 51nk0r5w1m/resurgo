@@ -2,7 +2,7 @@
 
 The demo scenario is entirely fictional. It shows Jordan Ellis coordinating a
 Fulton County divorce-related mortgage transition with fictional attorney
-Morgan Reed and fictional mortgage specialist Taylor Brooks. The fictional
+Morgan Reed and fictional mortgage specialist Whitney Owings. The fictional
 organizations are explicitly labeled as demo practices; Centurion is not used.
 
 ## Local preparation

@@ -3,12 +3,9 @@
 import { useRouter } from "next/navigation";
 import { type DragEvent, type FormEvent, useRef, useState } from "react";
 
-const maximumBytes = 15 * 1024 * 1024;
-const acceptedTypes = new Set([
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-]);
+import { isAcceptedDocumentFile } from "../lib/document-file-validation";
 
+const maximumBytes = 15 * 1024 * 1024;
 type UploadItem = {
   file: File;
   id: string;
@@ -26,8 +23,7 @@ export function DocumentUploadForm({ caseId }: { caseId: string }) {
 
   function addFiles(files: FileList | File[]) {
     const next = Array.from(files).map((file) => {
-      const invalidType =
-        !acceptedTypes.has(file.type) && !/\.(pdf|docx)$/iu.test(file.name);
+      const invalidType = !isAcceptedDocumentFile(file);
       const error = invalidType
         ? "Choose a PDF or DOCX file."
         : file.size > maximumBytes

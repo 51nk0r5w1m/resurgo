@@ -41,7 +41,7 @@ import { createResurgoAuth } from "../src/lib/auth-factory";
 const DEMO_EMAILS = {
   attorney: "morgan.reed.demo@resurgo.local",
   client: "jordan.ellis.demo@resurgo.local",
-  lender: "taylor.brooks.demo@resurgo.local",
+  lender: "whitney.owings.demo@resurgo.local",
 } as const;
 const repositoryRoot = resolve(import.meta.dirname, "../../..");
 const CREDENTIALS_PATH = resolve(
@@ -531,7 +531,7 @@ async function main() {
 
   const client = await createIdentity("Jordan Ellis", DEMO_EMAILS.client);
   const attorney = await createIdentity("Morgan Reed", DEMO_EMAILS.attorney);
-  const lender = await createIdentity("Taylor Brooks", DEMO_EMAILS.lender);
+  const lender = await createIdentity("Whitney Owings", DEMO_EMAILS.lender);
   const credentials: CredentialFile = {
     generatedAt: new Date().toISOString(),
     notice: "FICTIONAL SYNTHETIC DEMONSTRATION ACCOUNTS — LOCAL USE ONLY",

@@ -56,6 +56,16 @@ function memoryStorage(initial: Record<string, Uint8Array>) {
   return { objects, storage };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, reject, resolve };
+}
+
 describe.skipIf(!databaseUrl)("document worker state transitions", () => {
   let admin: pg.Client | undefined;
   let database: ReturnType<typeof createDatabase> | undefined;
@@ -178,5 +188,76 @@ describe.skipIf(!databaseUrl)("document worker state transitions", () => {
     expect(latest?.status).toBe("processing");
     expect(memory.objects.has(secondKeys.quarantine)).toBe(true);
     expect(memory.objects.has(secondKeys.available)).toBe(false);
+  });
+
+  test("does not reclaim a stale-looking version while another worker still holds its processing lock", async () => {
+    if (!database) throw new Error("Worker test database was not initialized");
+    const [owner] = await database.db
+      .insert(user)
+      .values({
+        email: `document-worker-race-${randomUUID()}@synthetic.example`,
+        name: "Synthetic Concurrent Worker Owner",
+      })
+      .returning();
+    if (!owner) throw new Error("Synthetic owner was not created");
+    const { case: clientCase } = await createCaseWithOwner(database.db, {
+      jurisdictionCode: "GA-FULTON-SUPERIOR",
+      ownerUserId: owner.id,
+    });
+    const pdf = await PDFDocument.create();
+    pdf.addPage([300, 200]);
+    const source = await pdf.save();
+    const created = await createDocumentWithVersion(database.db, {
+      byteSize: source.byteLength,
+      caseId: clientCase.id,
+      classification: "financial",
+      confidentiality: "financial_restricted",
+      contentHash: createHash("sha256").update(source).digest("hex"),
+      format: "pdf",
+      mimeType: "application/pdf",
+      retentionClass: "synthetic_worker_race_test",
+      source: "client_upload",
+      title: "Synthetic long-running scan",
+      userId: owner.id,
+    });
+    await database.db.insert(documentProcessingEvents).values({
+      caseId: clientCase.id,
+      documentId: created.document.id,
+      documentVersionId: created.version.id,
+      occurredAt: new Date(Date.now() - 6 * 60 * 1000),
+      status: "processing",
+    });
+    const keys = documentObjectKeys({
+      caseId: clientCase.id,
+      documentId: created.document.id,
+      versionId: created.version.id,
+    });
+    const memory = memoryStorage({ [keys.quarantine]: source });
+    const scanStarted = deferred<void>();
+    const releaseScan = deferred<void>();
+    const firstWorker = processNextDocument({
+      database: database.db,
+      scan: async () => {
+        scanStarted.resolve();
+        await releaseScan.promise;
+        return { clean: true };
+      },
+      storage: memory.storage,
+    });
+    await scanStarted.promise;
+
+    await expect(
+      processNextDocument({
+        database: database.db,
+        scan: async () => {
+          throw new Error("A competing worker must not process this version");
+        },
+        storage: memory.storage,
+      }),
+    ).resolves.toBe(false);
+
+    releaseScan.resolve();
+    await expect(firstWorker).resolves.toBe(true);
+    expect(memory.objects.has(keys.available)).toBe(true);
   });
 });

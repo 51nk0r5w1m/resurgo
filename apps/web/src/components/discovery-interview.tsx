@@ -3,6 +3,8 @@
 import { Check, ChevronLeft, ChevronRight, LockKeyhole } from "lucide-react";
 import { type FormEvent, useMemo, useState } from "react";
 
+import { isRequiredAnswerComplete } from "../lib/discovery-answer-status";
+
 type AnswerStatus = "answered" | "unknown" | "not_applicable" | "deferred";
 type Answer = {
   documentVersionId?: string;
@@ -287,7 +289,7 @@ export function DiscoveryInterview({
   const current = applicable[currentIndex];
   const answeredCount = applicable.filter(({ key }) => answers[key]).length;
   const requiredMissing = applicable.filter(
-    ({ key, required }) => required && !answers[key],
+    ({ key, required }) => required && !isRequiredAnswerComplete(answers[key]),
   );
 
   function move(offset: number) {

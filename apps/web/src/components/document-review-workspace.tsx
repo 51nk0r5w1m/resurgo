@@ -212,8 +212,10 @@ export function DocumentReviewWorkspace({
             try {
               await addComment(body);
               setMessage("Comment saved to this immutable version.");
+              return true;
             } catch {
               setMessage("Comment could not be saved.");
+              return false;
             }
           }}
         />
@@ -279,7 +281,7 @@ function CommentForm({
   onSave,
 }: {
   disabled: boolean;
-  onSave: (body: string) => Promise<void>;
+  onSave: (body: string) => Promise<boolean>;
 }) {
   const [body, setBody] = useState("");
   const [pending, setPending] = useState(false);
@@ -289,9 +291,11 @@ function CommentForm({
       onSubmit={async (event) => {
         event.preventDefault();
         setPending(true);
-        await onSave(body);
-        setBody("");
-        setPending(false);
+        try {
+          if (await onSave(body)) setBody("");
+        } finally {
+          setPending(false);
+        }
       }}
     >
       <label>
