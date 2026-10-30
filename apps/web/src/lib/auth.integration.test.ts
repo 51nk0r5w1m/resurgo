@@ -162,35 +162,51 @@ describe.skipIf(!databaseUrl)("Better Auth security boundary", () => {
     expect(await known.json()).toEqual(await unknown.json());
   });
 
-  it("does not report successful registration when verification delivery fails", async () => {
-    const deliveryFailureEmail = `delivery-failure-${randomUUID()}@example.test`;
-    const deliveryFailureAuth = createResurgoAuth({
+  it("waits for the verification delivery attempt before responding", async () => {
+    const deliveryEmail = `delivery-wait-${randomUUID()}@example.test`;
+    let releaseDelivery: (() => void) | undefined;
+    const deliveryStarted = new Promise<void>((resolve) => {
+      releaseDelivery = resolve;
+    });
+    let senderEntered = false;
+    const deliveryAuth = createResurgoAuth({
       appUrl,
       database: database.db,
       emailSender: async () => {
-        throw new Error("Synthetic delivery failure");
+        senderEntered = true;
+        await deliveryStarted;
       },
       secret:
         "synthetic-delivery-failure-secret-0123456789abcdef0123456789abcdef",
       secureCookies: false,
     });
-    const response = await deliveryFailureAuth.handler(
-      new Request(`${appUrl}/api/auth/sign-up/email`, {
-        body: JSON.stringify({
-          email: deliveryFailureEmail,
-          name: "Synthetic Delivery Failure",
-          password,
+    let responseSettled = false;
+    const responsePromise = deliveryAuth
+      .handler(
+        new Request(`${appUrl}/api/auth/sign-up/email`, {
+          body: JSON.stringify({
+            email: deliveryEmail,
+            name: "Synthetic Delivery Wait",
+            password,
+          }),
+          headers: {
+            "content-type": "application/json",
+            origin: appUrl,
+            "x-forwarded-for": "192.0.2.250",
+          },
+          method: "POST",
         }),
-        headers: {
-          "content-type": "application/json",
-          origin: appUrl,
-          "x-forwarded-for": "192.0.2.250",
-        },
-        method: "POST",
-      }),
-    );
+      )
+      .finally(() => {
+        responseSettled = true;
+      });
 
-    expect(response.status).toBe(500);
+    await expect.poll(() => senderEntered).toBe(true);
+    expect(responseSettled).toBe(false);
+    releaseDelivery?.();
+    const response = await responsePromise;
+
+    expect(response.status).toBe(200);
   });
 
   it("uses recovery tokens once and revokes existing sessions", async () => {

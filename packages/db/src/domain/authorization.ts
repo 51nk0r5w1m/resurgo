@@ -97,6 +97,17 @@ export async function decideCaseAuthorization(
       on organization.id = organization_membership.organization_id
     where case_membership.case_id = ${input.caseId}
       and case_membership.user_id = ${input.userId}
+    order by
+      case
+        when case_membership.status = 'active'
+          and case_membership.valid_from <= ${evaluatedAt}
+          and (case_membership.expires_at is null or case_membership.expires_at > ${evaluatedAt})
+          and case_membership.revoked_at is null
+        then 0 else 1
+      end,
+      case when case_membership.role = 'owner' then 0 else 1 end,
+      case_membership.created_at,
+      case_membership.id
     limit 1
   `);
   const row = result.rows[0];

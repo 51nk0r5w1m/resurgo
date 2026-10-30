@@ -16,16 +16,16 @@ export function TwoFactorChallenge() {
     const backup = data.get("backup") === "on";
     try {
       const result = backup
-      ? await authClient.twoFactor.verifyBackupCode({ code })
-    : await authClient.twoFactor.verifyTotp({ code, trustDevice: false });
+        ? await authClient.twoFactor.verifyBackupCode({ code })
+        : await authClient.twoFactor.verifyTotp({ code, trustDevice: false });
       if (result.error) {
-      setMessage("That verification code is not valid.");
-    return;
-  }
-} catch {
-  setMessage("We couldn't verify your code. Please try again.");
-  return;
-}
+        setMessage("That verification code is not valid.");
+        return;
+      }
+    } catch {
+      setMessage("We couldn't verify your code. Please try again.");
+      return;
+    }
     router.push("/dashboard");
     router.refresh();
   }

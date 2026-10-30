@@ -17,22 +17,22 @@ export function CaseCreationForm() {
     );
     try {
       const response = await fetch("/api/cases", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-    body: JSON.stringify({ jurisdictionCode }),
-    });
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jurisdictionCode }),
+      });
       if (!response.ok) {
+        setMessage("The private case could not be created.");
+        return;
+      }
+      const result = (await response.json()) as { case: { id: string } };
+      router.push(`/cases/${result.case.id}/discovery`);
+      router.refresh();
+    } catch {
       setMessage("The private case could not be created.");
+    } finally {
       setPending(false);
-    return;
     }
-    const result = (await response.json()) as { case: { id: string } };
-    router.push(`/cases/${result.case.id}/discovery`);
-    router.refresh();
-  } catch {
-    setMessage("The private case could not be created.");
-    setPending(false);
-  }
   }
 
   return (

@@ -138,6 +138,26 @@ async function createVerifiedOrganization(
 }
 
 describe("case and professional security boundaries", () => {
+  test("rejects duplicate memberships for the same user and case", async () => {
+    const owner = await createSyntheticUser("duplicate-membership-owner");
+    const { case: clientCase } = await createCaseWithOwner(database, {
+      jurisdictionCode: "GA-FULTON-SUPERIOR",
+      ownerUserId: owner.id,
+    });
+
+    await expectDatabaseError(
+      database.insert(schema.caseMemberships).values({
+        caseId: clientCase.id,
+        role: "co_client",
+        status: "active",
+        userId: owner.id,
+        validFrom: new Date(),
+      }),
+      "23505",
+      "case_memberships_case_user_unique",
+    );
+  });
+
   test("creates a case and its active owner membership atomically", async () => {
     const owner = await createSyntheticUser("owner");
     const result = await createCaseWithOwner(database, {
