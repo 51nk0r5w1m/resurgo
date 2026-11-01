@@ -5,6 +5,7 @@ import { type FormEvent, useMemo, useState } from "react";
 
 import {
   hasAnsweredQuestionValue,
+  isQuestionAddressed,
   isRequiredAnswerComplete,
 } from "../lib/discovery-answer-status";
 
@@ -67,10 +68,6 @@ type DocumentOption = {
 function answerValue(answers: Record<string, Answer | undefined>, key: string) {
   const answer = answers[key];
   return answer?.status === "answered" ? answer.value : undefined;
-}
-
-function hasAddressedQuestion(answer: Answer | undefined, isRequired: boolean) {
-  return !isRequired || isRequiredAnswerComplete(answer);
 }
 
 function conditionMatches(
@@ -277,8 +274,10 @@ export function DiscoveryInterview({
         !condition || conditionMatches(condition, initialAnswers),
     );
     return (
-      applicable.find(({ key }) => !hasAddressedQuestion(initialAnswers[key]))
-        ?.key ?? null
+      applicable.find(
+        ({ key, required }) =>
+          !isQuestionAddressed(initialAnswers[key], required),
+      )?.key ?? null
     );
   });
   const [reviewing, setReviewing] = useState(false);
@@ -345,8 +344,9 @@ export function DiscoveryInterview({
           !condition || conditionMatches(condition, nextAnswers),
       );
       const next = nextApplicable.find(
-        ({ key }) =>
-          key !== question.key && !hasAddressedQuestion(nextAnswers[key]),
+        ({ key, required }) =>
+          key !== question.key &&
+          !isQuestionAddressed(nextAnswers[key], required),
       );
       if (editingFromReview) {
         setEditingFromReview(false);
@@ -525,7 +525,8 @@ export function DiscoveryInterview({
               onClick={() => {
                 const target =
                   moduleQuestions.find(
-                    ({ key }) => !hasAddressedQuestion(answers[key]),
+                    ({ key, required }) =>
+                      !isQuestionAddressed(answers[key], required),
                   ) ?? moduleQuestions[0];
                 if (target) {
                   setCurrentKey(target.key);

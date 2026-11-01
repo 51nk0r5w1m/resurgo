@@ -86,6 +86,7 @@ export async function resetSyntheticDemo() {
   await database.connect();
   try {
     const previousPendingObjects = await readPendingObjects();
+    const carriedObjects: PendingObject[] = [];
     const retryableObjects: PendingObject[] = [];
     for (const pending of previousPendingObjects) {
       const version = await database.query(
@@ -95,7 +96,7 @@ export async function resetSyntheticDemo() {
       // A prepared cleanup record may survive a rolled-back transaction. Never
       // delete an object while its immutable version row still references it.
       if (version.rowCount) {
-        retryableObjects.push(pending);
+        carriedObjects.push(pending);
         continue;
       }
       try {
@@ -105,12 +106,12 @@ export async function resetSyntheticDemo() {
       }
     }
     if (retryableObjects.length > 0) {
-      await writePendingObjects(retryableObjects);
+      await writePendingObjects([...carriedObjects, ...retryableObjects]);
       throw new Error(
         `Failed to retry ${retryableObjects.length} pending demo object deletion(s)`,
       );
     }
-    if (previousPendingObjects.length > 0)
+    if (previousPendingObjects.length > 0 && carriedObjects.length === 0)
       await rm(PENDING_OBJECTS_PATH, { force: true });
 
     const users = await database.query<{ id: string }>(
@@ -149,7 +150,7 @@ export async function resetSyntheticDemo() {
               where case_id = any($1::uuid[])`,
             [caseIds],
           );
-    const pendingObjects = versions.rows.flatMap((version) => {
+    const generatedPendingObjects = versions.rows.flatMap((version) => {
       const keys = documentObjectKeys({
         caseId: version.case_id,
         documentId: version.document_id,
@@ -160,7 +161,22 @@ export async function resetSyntheticDemo() {
         versionId: version.id,
       }));
     });
-    if (pendingObjects.length > 0) await writePendingObjects(pendingObjects);
+    const resetVersionIds = new Set(versions.rows.map(({ id }) => id));
+    const retainedObjects = carriedObjects.filter(
+      ({ versionId }) => !resetVersionIds.has(versionId),
+    );
+    const pendingObjects = [
+      ...new Map(
+        [
+          ...carriedObjects.filter(({ versionId }) =>
+            resetVersionIds.has(versionId),
+          ),
+          ...generatedPendingObjects,
+        ].map((pending) => [pending.key, pending]),
+      ).values(),
+    ];
+    const preparedObjects = [...retainedObjects, ...pendingObjects];
+    if (preparedObjects.length > 0) await writePendingObjects(preparedObjects);
 
     await database.query("begin");
     try {
@@ -232,14 +248,16 @@ export async function resetSyntheticDemo() {
       if (result.status === "rejected" && pendingObjects[index])
         failedObjects.push(pendingObjects[index]);
     }
+    const remainingObjects = [...retainedObjects, ...failedObjects];
+    if (remainingObjects.length > 0)
+      await writePendingObjects(remainingObjects);
+    else if (preparedObjects.length > 0)
+      await rm(PENDING_OBJECTS_PATH, { force: true });
     if (failedObjects.length > 0) {
-      await writePendingObjects(failedObjects);
       throw new Error(
         `Database reset completed, but ${failedObjects.length} object deletion(s) require retry`,
       );
     }
-    if (pendingObjects.length > 0)
-      await rm(PENDING_OBJECTS_PATH, { force: true });
     await rm(
       resolve(import.meta.dirname, "../../../.secrets/demo-credentials.json"),
       {

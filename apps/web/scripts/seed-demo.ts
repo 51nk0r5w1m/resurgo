@@ -493,13 +493,13 @@ async function main() {
       );
     }
     const completionResult = await database.pool.query<{
-      available_versions: number;
+      available_documents: number;
       case_id: string;
       reviews: number;
     }>(
       `select
          c.id as case_id,
-         count(distinct dv.document_id) filter (where dv.processing_status = 'available')::int as available_versions,
+         count(distinct dv.document_id) filter (where dv.processing_status = 'available')::int as available_documents,
          count(distinct pr.id)::int as reviews
        from resurgo.cases c
        join resurgo.case_memberships cm
@@ -517,7 +517,7 @@ async function main() {
     const completed = completionResult.rows[0];
     if (
       !completed ||
-      completed.available_versions < 6 ||
+      completed.available_documents < 6 ||
       completed.reviews < 1
     ) {
       throw new Error(

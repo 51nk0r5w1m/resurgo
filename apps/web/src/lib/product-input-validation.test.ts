@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import {
   hasAnsweredQuestionValue,
+  isQuestionAddressed,
   isRequiredAnswerComplete,
 } from "./discovery-answer-status";
 import { isAcceptedDocumentFile } from "./document-file-validation";
@@ -32,6 +33,13 @@ describe("client-side product input validation", () => {
     expect(isRequiredAnswerComplete({ status: "not_applicable" })).toBe(true);
     expect(isRequiredAnswerComplete({ status: "unexpected" })).toBe(false);
     expect(isRequiredAnswerComplete(undefined)).toBe(false);
+  });
+
+  test("keeps optional questions in the guided flow until explicitly addressed", () => {
+    expect(isQuestionAddressed(undefined, false)).toBe(false);
+    expect(isQuestionAddressed({ status: "deferred" }, false)).toBe(true);
+    expect(isQuestionAddressed({ status: "unknown" }, true)).toBe(true);
+    expect(isQuestionAddressed({ status: "unexpected" }, true)).toBe(false);
   });
 
   test("rejects empty answered values without native form validation", () => {
