@@ -5,6 +5,7 @@ import { type FormEvent, useMemo, useState } from "react";
 
 import {
   hasAnsweredQuestionValue,
+  isQuestionAddressed,
   isRequiredAnswerComplete,
 } from "../lib/discovery-answer-status";
 
@@ -274,7 +275,8 @@ export function DiscoveryInterview({
     );
     return (
       applicable.find(
-        ({ key }) => !isRequiredAnswerComplete(initialAnswers[key]),
+        ({ key, required }) =>
+          !isQuestionAddressed(initialAnswers[key], required),
       )?.key ?? null
     );
   });
@@ -342,8 +344,9 @@ export function DiscoveryInterview({
           !condition || conditionMatches(condition, nextAnswers),
       );
       const next = nextApplicable.find(
-        ({ key }) =>
-          key !== question.key && !isRequiredAnswerComplete(nextAnswers[key]),
+        ({ key, required }) =>
+          key !== question.key &&
+          !isQuestionAddressed(nextAnswers[key], required),
       );
       if (editingFromReview) {
         setEditingFromReview(false);
@@ -522,7 +525,8 @@ export function DiscoveryInterview({
               onClick={() => {
                 const target =
                   moduleQuestions.find(
-                    ({ key }) => !isRequiredAnswerComplete(answers[key]),
+                    ({ key, required }) =>
+                      !isQuestionAddressed(answers[key], required),
                   ) ?? moduleQuestions[0];
                 if (target) {
                   setCurrentKey(target.key);

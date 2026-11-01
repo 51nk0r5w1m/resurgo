@@ -23,25 +23,34 @@ export function PdfDocumentViewer({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const startRef = useRef<{ x: number; y: number } | null>(null);
-  const [document, setDocument] = useState<PDFDocumentProxy>();
+  const [loadedDocument, setLoadedDocument] = useState<{
+    pdf: PDFDocumentProxy;
+    source: string;
+  }>();
   const [page, setPage] = useState(1);
   const [scale, setScale] = useState(1.15);
   const [failure, setFailure] = useState<{ key: string; message: string }>();
+  const document =
+    loadedDocument?.source === source ? loadedDocument.pdf : undefined;
   const renderKey = `${source}:${page}:${scale}`;
   useEffect(() => {
+    let active = true;
     const task = getDocument({ url: source, withCredentials: true });
     task.promise
       .then((pdf) => {
-        setDocument(pdf);
+        if (!active) return;
+        setLoadedDocument({ pdf, source });
         setPage(1);
       })
-      .catch(() =>
+      .catch(() => {
+        if (!active) return;
         setFailure({
           key: source,
           message: "The authorized PDF preview could not be opened.",
-        }),
-      );
+        });
+      });
     return () => {
+      active = false;
       void task.destroy();
     };
   }, [source]);

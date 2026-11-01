@@ -1,4 +1,4 @@
-import { rm } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { parseEnvironment } from "@resurgo/config";
@@ -17,6 +17,55 @@ const DEMO_ORGANIZATION_SLUGS = [
   "peachtree-family-law-demo",
   "piedmont-mortgage-transition-demo",
 ] as const;
+const SECRETS_DIRECTORY = resolve(import.meta.dirname, "../../../.secrets");
+const PENDING_OBJECTS_PATH = resolve(
+  SECRETS_DIRECTORY,
+  "demo-reset-pending-objects.json",
+);
+type PendingObject = {
+  caseId: string;
+  documentId: string;
+  key: string;
+  versionId: string;
+};
+
+async function readPendingObjects(): Promise<PendingObject[]> {
+  try {
+    const value: unknown = JSON.parse(
+      await readFile(PENDING_OBJECTS_PATH, "utf8"),
+    );
+    if (
+      !Array.isArray(value) ||
+      !value.every(
+        (item): item is PendingObject =>
+          typeof item === "object" &&
+          item !== null &&
+          "caseId" in item &&
+          typeof item.caseId === "string" &&
+          "documentId" in item &&
+          typeof item.documentId === "string" &&
+          "key" in item &&
+          typeof item.key === "string" &&
+          "versionId" in item &&
+          typeof item.versionId === "string",
+      )
+    )
+      throw new Error("Invalid pending demo object cleanup record");
+    return value;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
+  }
+}
+
+async function writePendingObjects(objects: PendingObject[]) {
+  await mkdir(SECRETS_DIRECTORY, { mode: 0o700, recursive: true });
+  const temporaryPath = `${PENDING_OBJECTS_PATH}.tmp`;
+  await writeFile(temporaryPath, `${JSON.stringify(objects, null, 2)}\n`, {
+    mode: 0o600,
+  });
+  await rename(temporaryPath, PENDING_OBJECTS_PATH);
+}
 
 function assertLocalDatabase(databaseUrl: string, nodeEnvironment: string) {
   const parsed = new URL(databaseUrl);
@@ -45,6 +94,67 @@ export async function resetSyntheticDemo() {
   });
   await database.connect();
   try {
+    const previousPendingObjects = await readPendingObjects();
+    const carriedObjects: PendingObject[] = [];
+    const retryableObjects: PendingObject[] = [];
+    for (const pending of previousPendingObjects) {
+      const expectedKeys = Object.values(
+        documentObjectKeys({
+          caseId: pending.caseId,
+          documentId: pending.documentId,
+          versionId: pending.versionId,
+        }),
+      );
+      if (!expectedKeys.includes(pending.key))
+        throw new Error("Invalid pending demo object key");
+      const version = await database.query<{
+        case_id: string;
+        demo_scoped: boolean;
+        document_id: string;
+      }>(
+        `select dv.case_id, dv.document_id,
+           (c.owner_user_id in (
+              select id from auth.user where email = any($2::text[])
+            ) or exists (
+              select 1
+                from resurgo.case_memberships cm
+                join auth.user u on u.id = cm.user_id
+               where cm.case_id = c.id and u.email = any($2::text[])
+            )) as demo_scoped
+           from resurgo.document_versions dv
+           join resurgo.cases c on c.id = dv.case_id
+          where dv.id = $1
+          limit 1`,
+        [pending.versionId, DEMO_EMAILS],
+      );
+      // A prepared cleanup record may survive a rolled-back transaction. Never
+      // delete an object while its immutable version row still references it.
+      const referencedVersion = version.rows[0];
+      if (referencedVersion) {
+        if (
+          !referencedVersion.demo_scoped ||
+          referencedVersion.case_id !== pending.caseId ||
+          referencedVersion.document_id !== pending.documentId
+        )
+          throw new Error("Pending object is outside the synthetic demo scope");
+        carriedObjects.push(pending);
+        continue;
+      }
+      try {
+        await storage.delete(pending.key);
+      } catch {
+        retryableObjects.push(pending);
+      }
+    }
+    if (retryableObjects.length > 0) {
+      await writePendingObjects([...carriedObjects, ...retryableObjects]);
+      throw new Error(
+        `Failed to retry ${retryableObjects.length} pending demo object deletion(s)`,
+      );
+    }
+    if (previousPendingObjects.length > 0 && carriedObjects.length === 0)
+      await rm(PENDING_OBJECTS_PATH, { force: true });
+
     const users = await database.query<{ id: string }>(
       "select id from auth.user where email = any($1::text[])",
       [DEMO_EMAILS],
@@ -81,23 +191,35 @@ export async function resetSyntheticDemo() {
               where case_id = any($1::uuid[])`,
             [caseIds],
           );
-    for (const version of versions.rows) {
+    const generatedPendingObjects = versions.rows.flatMap((version) => {
       const keys = documentObjectKeys({
         caseId: version.case_id,
         documentId: version.document_id,
         versionId: version.id,
       });
-      const objectKeys = [keys.available, keys.preview, keys.quarantine];
-      const results = await Promise.allSettled(
-        objectKeys.map((key) => storage.delete(key)),
-      );
-      for (const [index, result] of results.entries()) {
-        if (result.status === "rejected") {
-          console.error(`Failed to delete demo object ${objectKeys[index]}`);
-          process.exitCode = 1;
-        }
-      }
-    }
+      return [keys.available, keys.preview, keys.quarantine].map((key) => ({
+        caseId: version.case_id,
+        documentId: version.document_id,
+        key,
+        versionId: version.id,
+      }));
+    });
+    const resetVersionIds = new Set(versions.rows.map(({ id }) => id));
+    const retainedObjects = carriedObjects.filter(
+      ({ versionId }) => !resetVersionIds.has(versionId),
+    );
+    const pendingObjects = [
+      ...new Map(
+        [
+          ...carriedObjects.filter(({ versionId }) =>
+            resetVersionIds.has(versionId),
+          ),
+          ...generatedPendingObjects,
+        ].map((pending) => [pending.key, pending]),
+      ).values(),
+    ];
+    const preparedObjects = [...retainedObjects, ...pendingObjects];
+    if (preparedObjects.length > 0) await writePendingObjects(preparedObjects);
 
     await database.query("begin");
     try {
@@ -160,6 +282,24 @@ export async function resetSyntheticDemo() {
     } catch (error) {
       await database.query("rollback");
       throw error;
+    }
+    const failedObjects: PendingObject[] = [];
+    const deletionResults = await Promise.allSettled(
+      pendingObjects.map(({ key }) => storage.delete(key)),
+    );
+    for (const [index, result] of deletionResults.entries()) {
+      if (result.status === "rejected" && pendingObjects[index])
+        failedObjects.push(pendingObjects[index]);
+    }
+    const remainingObjects = [...retainedObjects, ...failedObjects];
+    if (remainingObjects.length > 0)
+      await writePendingObjects(remainingObjects);
+    else if (preparedObjects.length > 0)
+      await rm(PENDING_OBJECTS_PATH, { force: true });
+    if (failedObjects.length > 0) {
+      throw new Error(
+        `Database reset completed, but ${failedObjects.length} object deletion(s) require retry`,
+      );
     }
     await rm(
       resolve(import.meta.dirname, "../../../.secrets/demo-credentials.json"),

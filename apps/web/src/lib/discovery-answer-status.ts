@@ -8,6 +8,15 @@ export function isRequiredAnswerComplete(
   );
 }
 
+export function isQuestionAddressed(
+  answer: { status: string } | undefined,
+  required: boolean,
+) {
+  return required
+    ? isRequiredAnswerComplete(answer)
+    : Boolean(answer && answer.status !== "unanswered");
+}
+
 export function hasAnsweredQuestionValue(type: string, value: unknown) {
   if (type === "multiple_choice" || type === "structured_entities")
     return Array.isArray(value) && value.length > 0;
