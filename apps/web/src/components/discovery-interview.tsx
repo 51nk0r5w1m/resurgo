@@ -69,8 +69,8 @@ function answerValue(answers: Record<string, Answer | undefined>, key: string) {
   return answer?.status === "answered" ? answer.value : undefined;
 }
 
-function hasAddressedQuestion(answer: Answer | undefined) {
-  return Boolean(answer);
+function hasAddressedQuestion(answer: Answer | undefined, isRequired: boolean) {
+  return !isRequired || isRequiredAnswerComplete(answer);
 }
 
 function conditionMatches(
