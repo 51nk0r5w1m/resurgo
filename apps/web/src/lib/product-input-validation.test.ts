@@ -37,6 +37,7 @@ describe("client-side product input validation", () => {
 
   test("keeps optional questions in the guided flow until explicitly addressed", () => {
     expect(isQuestionAddressed(undefined, false)).toBe(false);
+    expect(isQuestionAddressed({ status: "unanswered" }, false)).toBe(false);
     expect(isQuestionAddressed({ status: "deferred" }, false)).toBe(true);
     expect(isQuestionAddressed({ status: "unknown" }, true)).toBe(true);
     expect(isQuestionAddressed({ status: "unexpected" }, true)).toBe(false);
