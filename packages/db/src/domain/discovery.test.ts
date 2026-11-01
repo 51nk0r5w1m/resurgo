@@ -45,10 +45,18 @@ describe("versioned Atlanta pilot discovery engine", () => {
     const result = evaluateDiscoveryRules(answers);
     expect(applicable).not.toContain("mortgage_status");
     expect(applicable).not.toContain("dependent_summary");
+    expect(applicable).not.toContain("order_document");
     expect(result.recommendations.map(({ service }) => service)).toEqual([
       "divorce_attorney",
     ]);
     expect(result.outputs).toEqual([]);
+  });
+
+  it("hides order evidence whenever none is among the selected order values", () => {
+    const applicable = applicableDiscoveryQuestions(
+      scenario({ existing_orders: ["temporary_order", "none"] }),
+    ).map(({ key }) => key);
+    expect(applicable).not.toContain("order_document");
   });
 
   it("creates home-retention mortgage evidence and feasibility review", () => {

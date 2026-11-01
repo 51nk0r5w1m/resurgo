@@ -3,7 +3,10 @@
 import { Check, ChevronLeft, ChevronRight, LockKeyhole } from "lucide-react";
 import { type FormEvent, useMemo, useState } from "react";
 
-import { isRequiredAnswerComplete } from "../lib/discovery-answer-status";
+import {
+  hasAnsweredQuestionValue,
+  isRequiredAnswerComplete,
+} from "../lib/discovery-answer-status";
 
 type AnswerStatus = "answered" | "unknown" | "not_applicable" | "deferred";
 type Answer = {
@@ -15,7 +18,7 @@ type Answer = {
 };
 type Condition =
   | { key: string; operator: "equals" | "not_equals"; value: unknown }
-  | { key: string; operator: "includes"; value: string }
+  | { key: string; operator: "includes" | "not_includes"; value: string }
   | { conditions: Condition[]; operator: "all" | "any" };
 type Question = {
   classification: string;
@@ -78,6 +81,8 @@ function conditionMatches(
   const value = answerValue(answers, condition.key);
   if (condition.operator === "includes")
     return Array.isArray(value) && value.includes(condition.value);
+  if (condition.operator === "not_includes")
+    return !Array.isArray(value) || !value.includes(condition.value);
   if (condition.operator === "equals")
     return Array.isArray(condition.value)
       ? JSON.stringify(value) === JSON.stringify(condition.value)
@@ -138,7 +143,6 @@ function QuestionControl({
             <input
               defaultChecked={value === option.value}
               name="value"
-              required
               type="radio"
               value={option.value}
             />
@@ -371,6 +375,12 @@ export function DiscoveryInterview({
         .filter(Boolean)
         .map((summary) => ({ summary }));
     else value = String(form.get("value") ?? "").trim();
+    if (current.required && !hasAnsweredQuestionValue(current.type, value)) {
+      setMessage(
+        "Choose or enter an answer, or use an alternative answer status.",
+      );
+      return;
+    }
     await persist(current, { status: "answered", value });
   }
 

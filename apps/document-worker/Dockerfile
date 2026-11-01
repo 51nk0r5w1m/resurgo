@@ -20,4 +20,6 @@ COPY packages/db packages/db
 COPY packages/documents packages/documents
 
 USER node
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD ["node", "-e", "const command = require('node:fs').readFileSync('/proc/1/cmdline', 'utf8'); process.exit(command.includes('apps/document-worker/src/index.ts') ? 0 : 1)"]
 CMD ["./apps/document-worker/node_modules/.bin/tsx", "apps/document-worker/src/index.ts"]

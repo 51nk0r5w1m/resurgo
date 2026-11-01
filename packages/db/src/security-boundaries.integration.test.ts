@@ -52,6 +52,7 @@ import {
   listAuthorizedProfessionalReviews,
   recordAttorneyReviewAcknowledgement,
 } from "./domain/reviews";
+import { markDiscoveryOutputWorkflowComplete } from "./domain/workflows";
 import * as schema from "./schema";
 
 const { Client, Pool } = pg;
@@ -1964,6 +1965,123 @@ describe("central case authorization", () => {
 });
 
 describe("versioned discovery and roadmap", () => {
+  test("requires case management authority to complete generated workflow state", async () => {
+    const owner = await createSyntheticUser("workflow-owner");
+    const collaborator = await createSyntheticUser("workflow-collaborator");
+    const {
+      case: clientCase,
+      discoverySession,
+      ownerMembership,
+    } = await createCaseWithOwner(database, {
+      jurisdictionCode: "GA-FULTON-SUPERIOR",
+      ownerUserId: owner.id,
+    });
+    const collaboratorMembership = await grantCaseMembership(database, {
+      actorUserId: owner.id,
+      caseId: clientCase.id,
+      role: "co_client",
+      userId: collaborator.id,
+    });
+    await acceptCaseMembership(database, {
+      caseId: clientCase.id,
+      membershipId: collaboratorMembership.id,
+      userId: collaborator.id,
+    });
+    const [output] = await database
+      .insert(schema.discoveryOutputs)
+      .values({
+        caseId: clientCase.id,
+        classification: "legal",
+        code: "synthetic_workflow_authorization",
+        discoverySessionId: discoverySession.id,
+        explanation: "Synthetic workflow authorization boundary.",
+        generation: 1,
+        ruleId: "SYNTHETIC-AUTH-001",
+        title: "Synthetic workflow authorization",
+        type: "review_trigger",
+      })
+      .returning();
+    if (!output) throw new Error("Synthetic discovery output was not created");
+    const [resource] = await database
+      .insert(schema.caseResources)
+      .values({
+        caseId: clientCase.id,
+        classification: "legal",
+        ownerCaseMembershipId: ownerMembership.id,
+        type: "case_task",
+      })
+      .returning();
+    if (!resource) throw new Error("Synthetic case resource was not created");
+    const [task] = await database
+      .insert(schema.caseTasks)
+      .values({
+        caseId: clientCase.id,
+        caseResourceId: resource.id,
+        classification: "legal",
+        description: "Synthetic task must remain open after denied access.",
+        responsibleRole: "attorney",
+        sourceDiscoveryOutputId: output.id,
+        title: "Synthetic authorization task",
+      })
+      .returning();
+    if (!task) throw new Error("Synthetic case task was not created");
+    await database.insert(schema.caseTaskEvents).values({
+      actorCaseMembershipId: ownerMembership.id,
+      caseId: clientCase.id,
+      caseTaskId: task.id,
+      status: "open",
+    });
+    const [roadmap] = await database
+      .insert(schema.roadmapItems)
+      .values({
+        caseId: clientCase.id,
+        description: "Synthetic roadmap authorization boundary.",
+        generation: 1,
+        position: 1,
+        sourceDiscoveryOutputId: output.id,
+        status: "ready",
+        title: "Synthetic authorization roadmap item",
+      })
+      .returning();
+    const [prerequisite] = await database
+      .insert(schema.reviewPrerequisites)
+      .values({
+        caseId: clientCase.id,
+        code: "synthetic_workflow_authorization",
+        description: "Synthetic prerequisite authorization boundary.",
+        responsibleRole: "attorney",
+        sourceDiscoveryOutputId: output.id,
+        title: "Synthetic authorization prerequisite",
+      })
+      .returning();
+    if (!roadmap || !prerequisite)
+      throw new Error("Synthetic workflow state was not created");
+
+    await expect(
+      markDiscoveryOutputWorkflowComplete(database, {
+        caseId: clientCase.id,
+        sourceDiscoveryOutputId: output.id,
+        userId: collaborator.id,
+      }),
+    ).rejects.toMatchObject({ code: "RESOURCE_UNAVAILABLE" });
+
+    const taskEvents = await database
+      .select({ status: schema.caseTaskEvents.status })
+      .from(schema.caseTaskEvents)
+      .where(eq(schema.caseTaskEvents.caseTaskId, task.id));
+    const [unchangedRoadmap] = await database
+      .select({ status: schema.roadmapItems.status })
+      .from(schema.roadmapItems)
+      .where(eq(schema.roadmapItems.id, roadmap.id));
+    const [unchangedPrerequisite] = await database
+      .select({ status: schema.reviewPrerequisites.status })
+      .from(schema.reviewPrerequisites)
+      .where(eq(schema.reviewPrerequisites.id, prerequisite.id));
+    expect(taskEvents.map(({ status }) => status)).toEqual(["open"]);
+    expect(unchangedRoadmap?.status).toBe("ready");
+    expect(unchangedPrerequisite?.status).toBe("outstanding");
+  });
+
   test("rejects cross-case recommendation and roadmap references", async () => {
     const owner = await createSyntheticUser("discovery-reference-owner");
     const first = await createCaseWithOwner(database, {

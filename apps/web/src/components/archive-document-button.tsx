@@ -14,10 +14,15 @@ export function ArchiveDocumentButton({
   const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState("");
   async function archive() {
-    const response = await fetch(
-      `/api/cases/${caseId}/documents/${documentId}`,
-      { method: "DELETE" },
-    );
+    let response: Response;
+    try {
+      response = await fetch(`/api/cases/${caseId}/documents/${documentId}`, {
+        method: "DELETE",
+      });
+    } catch {
+      setMessage("This document could not be archived. Please try again.");
+      return;
+    }
     if (!response.ok) {
       setMessage(
         "This document could not be archived. A legal hold or current permission may prevent the change.",

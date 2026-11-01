@@ -29,7 +29,7 @@ export type DiscoveryAnswers = Record<string, DiscoveryAnswer | undefined>;
 
 type Condition =
   | { key: string; operator: "equals" | "not_equals"; value: unknown }
-  | { key: string; operator: "includes"; value: string }
+  | { key: string; operator: "includes" | "not_includes"; value: string }
   | { conditions: Condition[]; operator: "all" | "any" };
 
 export type DiscoveryQuestion = {
@@ -719,8 +719,8 @@ export const atlantaDiscoveryQuestions: readonly DiscoveryQuestion[] = [
     required: false,
     condition: {
       key: "existing_orders",
-      operator: "not_equals",
-      value: ["none"],
+      operator: "not_includes",
+      value: "none",
     },
   },
   {
@@ -797,6 +797,8 @@ export function conditionMatches(
   const value = answerValue(answers, condition.key);
   if (condition.operator === "includes")
     return Array.isArray(value) && value.includes(condition.value);
+  if (condition.operator === "not_includes")
+    return !Array.isArray(value) || !value.includes(condition.value);
   if (condition.operator === "equals")
     return Array.isArray(condition.value)
       ? JSON.stringify(value) === JSON.stringify(condition.value)

@@ -1,5 +1,5 @@
 import { createHmac, randomBytes } from "node:crypto";
-import { chmod, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const role = process.argv[2];
@@ -91,15 +91,26 @@ await request("/two-factor/verify-totp", {
 });
 
 const nextPassword = `R!${randomBytes(32).toString("base64url")}`;
-await request("/change-password", {
-  currentPassword: account.password,
-  newPassword: nextPassword,
-  revokeOtherSessions: true,
-});
-
+const previousPassword = account.password;
 credentials.generatedAt = new Date().toISOString();
 credentials.accounts[role].password = nextPassword;
 const temporaryPath = `${credentialsPath}.${process.pid}.tmp`;
+const recoveryPath = `${credentialsPath}.${role}.recovery`;
+await writeFile(
+  recoveryPath,
+  `${JSON.stringify(
+    {
+      email: account.email,
+      nextPassword,
+      previousPassword,
+      role,
+    },
+    null,
+    2,
+  )}\n`,
+  { flag: "wx", mode: 0o600 },
+);
+await chmod(recoveryPath, 0o600);
 await writeFile(temporaryPath, `${JSON.stringify(credentials, null, 2)}\n`, {
   flag: "wx",
   mode: 0o600,
@@ -107,6 +118,20 @@ await writeFile(temporaryPath, `${JSON.stringify(credentials, null, 2)}\n`, {
 await chmod(temporaryPath, 0o600);
 await rename(temporaryPath, credentialsPath);
 await chmod(credentialsPath, 0o600);
+
+try {
+  await request("/change-password", {
+    currentPassword: previousPassword,
+    newPassword: nextPassword,
+    revokeOtherSessions: true,
+  });
+} catch (error) {
+  throw new Error(
+    `Demo credential rotation did not complete. Recovery credentials are stored at ${recoveryPath}.`,
+    { cause: error },
+  );
+}
+await unlink(recoveryPath);
 
 console.log(
   `${role} demo credentials rotated. Retrieve them from .secrets/demo-credentials.json.`,

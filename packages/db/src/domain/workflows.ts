@@ -69,7 +69,7 @@ export async function markDiscoveryOutputWorkflowComplete(
   return database.transaction(async (transaction) => {
     const actor = await requireCaseAuthorization(transaction, {
       caseId: input.caseId,
-      operation: "read",
+      operation: "manage",
       userId: input.userId,
     });
     const tasks = await transaction

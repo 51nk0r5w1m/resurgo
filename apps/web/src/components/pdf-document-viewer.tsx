@@ -130,7 +130,9 @@ export function PdfDocumentViewer({
             };
           }}
           onPointerUp={(event) => {
-            if (!startRef.current || !onHighlight) return;
+            const start = startRef.current;
+            startRef.current = null;
+            if (!start || !onHighlight) return;
             const bounds = event.currentTarget.getBoundingClientRect();
             const end = {
               x: (event.clientX - bounds.left) / bounds.width,
@@ -139,13 +141,12 @@ export function PdfDocumentViewer({
             onHighlight({
               page,
               rect: {
-                height: Math.abs(end.y - startRef.current.y),
-                width: Math.abs(end.x - startRef.current.x),
-                x: Math.min(end.x, startRef.current.x),
-                y: Math.min(end.y, startRef.current.y),
+                height: Math.abs(end.y - start.y),
+                width: Math.abs(end.x - start.x),
+                x: Math.min(end.x, start.x),
+                y: Math.min(end.y, start.y),
               },
             });
-            startRef.current = null;
           }}
           ref={canvasRef}
         />

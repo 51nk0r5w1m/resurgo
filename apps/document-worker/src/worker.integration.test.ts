@@ -22,10 +22,6 @@ import { processNextDocument } from "./worker";
 
 const databaseUrl = process.env.DATABASE_URL;
 const databaseName = `resurgo_worker_${randomUUID().replaceAll("-", "")}`;
-const adminUrl = new URL(databaseUrl ?? "postgresql://invalid/invalid");
-adminUrl.pathname = "/postgres";
-const testUrl = new URL(databaseUrl ?? "postgresql://invalid/invalid");
-testUrl.pathname = `/${databaseName}`;
 
 function memoryStorage(initial: Record<string, Uint8Array>) {
   const objects = new Map(Object.entries(initial));
@@ -71,6 +67,11 @@ describe.skipIf(!databaseUrl)("document worker state transitions", () => {
   let database: ReturnType<typeof createDatabase> | undefined;
 
   beforeAll(async () => {
+    if (!databaseUrl) return;
+    const adminUrl = new URL(databaseUrl);
+    adminUrl.pathname = "/postgres";
+    const testUrl = new URL(databaseUrl);
+    testUrl.pathname = `/${databaseName}`;
     admin = new pg.Client({ connectionString: adminUrl.toString() });
     await admin.connect();
     await admin.query(`CREATE DATABASE "${databaseName}"`);

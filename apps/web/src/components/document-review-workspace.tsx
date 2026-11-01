@@ -123,7 +123,10 @@ export function DocumentReviewWorkspace({
         <label>
           Version
           <select
-            onChange={(event) => setSelectedId(event.target.value)}
+            onChange={(event) => {
+              setSelectedId(event.target.value);
+              setCompareId("");
+            }}
             value={selectedId}
           >
             {versions.map((version) => (
@@ -143,7 +146,10 @@ export function DocumentReviewWorkspace({
             >
               <option value="">No comparison</option>
               {versions
-                .filter(({ id }) => id !== selectedId)
+                .filter(
+                  ({ id, processing_status }) =>
+                    id !== selectedId && processing_status === "available",
+                )
                 .map((version) => (
                   <option key={version.id} value={version.id}>
                     Version {version.version_number}

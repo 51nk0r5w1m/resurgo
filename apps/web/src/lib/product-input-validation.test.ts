@@ -1,6 +1,9 @@
 import { describe, expect, test } from "vitest";
 
-import { isRequiredAnswerComplete } from "./discovery-answer-status";
+import {
+  hasAnsweredQuestionValue,
+  isRequiredAnswerComplete,
+} from "./discovery-answer-status";
 import { isAcceptedDocumentFile } from "./document-file-validation";
 
 describe("client-side product input validation", () => {
@@ -22,11 +25,22 @@ describe("client-side product input validation", () => {
     ).toBe(false);
   });
 
-  test("does not treat unknown, deferred, or inapplicable facts as answered", () => {
+  test("treats every explicit supported status as addressing a required question", () => {
     expect(isRequiredAnswerComplete({ status: "answered" })).toBe(true);
-    expect(isRequiredAnswerComplete({ status: "unknown" })).toBe(false);
-    expect(isRequiredAnswerComplete({ status: "deferred" })).toBe(false);
-    expect(isRequiredAnswerComplete({ status: "not_applicable" })).toBe(false);
+    expect(isRequiredAnswerComplete({ status: "unknown" })).toBe(true);
+    expect(isRequiredAnswerComplete({ status: "deferred" })).toBe(true);
+    expect(isRequiredAnswerComplete({ status: "not_applicable" })).toBe(true);
+    expect(isRequiredAnswerComplete({ status: "unexpected" })).toBe(false);
     expect(isRequiredAnswerComplete(undefined)).toBe(false);
+  });
+
+  test("rejects empty answered values without native form validation", () => {
+    expect(hasAnsweredQuestionValue("single_choice", "")).toBe(false);
+    expect(hasAnsweredQuestionValue("single_choice", "yes")).toBe(true);
+    expect(hasAnsweredQuestionValue("multiple_choice", [])).toBe(false);
+    expect(hasAnsweredQuestionValue("multiple_choice", ["none"])).toBe(true);
+    expect(hasAnsweredQuestionValue("structured_entities", [])).toBe(false);
+    expect(hasAnsweredQuestionValue("currency", Number.NaN)).toBe(false);
+    expect(hasAnsweredQuestionValue("currency", 0)).toBe(true);
   });
 });

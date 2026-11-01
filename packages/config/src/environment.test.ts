@@ -47,6 +47,22 @@ describe("environment validation", () => {
     );
   });
 
+  it("rejects document-worker scanner destinations outside the ClamAV boundary", () => {
+    const workerEnvironment = {
+      CLAMAV_HOST: "169.254.169.254",
+      CLAMAV_PORT: "80",
+      DATABASE_URL: validEnvironment.DATABASE_URL,
+      GARAGE_ACCESS_KEY_ID: validEnvironment.GARAGE_ACCESS_KEY_ID,
+      GARAGE_BUCKET: validEnvironment.GARAGE_BUCKET,
+      GARAGE_ENDPOINT: validEnvironment.GARAGE_ENDPOINT,
+      GARAGE_REGION: validEnvironment.GARAGE_REGION,
+      GARAGE_SECRET_ACCESS_KEY: validEnvironment.GARAGE_SECRET_ACCESS_KEY,
+      NODE_ENV: validEnvironment.NODE_ENV,
+    };
+
+    expect(() => parseDocumentWorkerEnvironment(workerEnvironment)).toThrow();
+  });
+
   it("rejects placeholder secrets without echoing their values", () => {
     try {
       parseEnvironment({ ...validEnvironment, POSTGRES_PASSWORD: "change-me" });

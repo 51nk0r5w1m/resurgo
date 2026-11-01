@@ -10,8 +10,10 @@ const nonPlaceholderSecret = z
 
 export const environmentSchema = z.object({
   BETTER_AUTH_SECRET: nonPlaceholderSecret.min(32),
-  CLAMAV_HOST: z.string().min(1).default("127.0.0.1"),
-  CLAMAV_PORT: z.coerce.number().int().min(1).max(65535).default(3310),
+  CLAMAV_HOST: z
+    .enum(["127.0.0.1", "localhost", "::1", "clamav"])
+    .default("127.0.0.1"),
+  CLAMAV_PORT: z.coerce.number().pipe(z.literal(3310)).default(3310),
   DATABASE_URL: z.url().startsWith("postgresql://"),
   GARAGE_ACCESS_KEY_ID: z.string().startsWith("GK").min(18),
   GARAGE_BUCKET: z.string().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/),
