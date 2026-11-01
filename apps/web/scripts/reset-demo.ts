@@ -22,7 +22,12 @@ const PENDING_OBJECTS_PATH = resolve(
   SECRETS_DIRECTORY,
   "demo-reset-pending-objects.json",
 );
-type PendingObject = { key: string; versionId: string };
+type PendingObject = {
+  caseId: string;
+  documentId: string;
+  key: string;
+  versionId: string;
+};
 
 async function readPendingObjects(): Promise<PendingObject[]> {
   try {
@@ -35,6 +40,10 @@ async function readPendingObjects(): Promise<PendingObject[]> {
         (item): item is PendingObject =>
           typeof item === "object" &&
           item !== null &&
+          "caseId" in item &&
+          typeof item.caseId === "string" &&
+          "documentId" in item &&
+          typeof item.documentId === "string" &&
           "key" in item &&
           typeof item.key === "string" &&
           "versionId" in item &&
@@ -89,13 +98,45 @@ export async function resetSyntheticDemo() {
     const carriedObjects: PendingObject[] = [];
     const retryableObjects: PendingObject[] = [];
     for (const pending of previousPendingObjects) {
-      const version = await database.query(
-        "select 1 from resurgo.document_versions where id = $1 limit 1",
-        [pending.versionId],
+      const expectedKeys = Object.values(
+        documentObjectKeys({
+          caseId: pending.caseId,
+          documentId: pending.documentId,
+          versionId: pending.versionId,
+        }),
+      );
+      if (!expectedKeys.includes(pending.key))
+        throw new Error("Invalid pending demo object key");
+      const version = await database.query<{
+        case_id: string;
+        demo_scoped: boolean;
+        document_id: string;
+      }>(
+        `select dv.case_id, dv.document_id,
+           (c.owner_user_id in (
+              select id from auth.user where email = any($2::text[])
+            ) or exists (
+              select 1
+                from resurgo.case_memberships cm
+                join auth.user u on u.id = cm.user_id
+               where cm.case_id = c.id and u.email = any($2::text[])
+            )) as demo_scoped
+           from resurgo.document_versions dv
+           join resurgo.cases c on c.id = dv.case_id
+          where dv.id = $1
+          limit 1`,
+        [pending.versionId, DEMO_EMAILS],
       );
       // A prepared cleanup record may survive a rolled-back transaction. Never
       // delete an object while its immutable version row still references it.
-      if (version.rowCount) {
+      const referencedVersion = version.rows[0];
+      if (referencedVersion) {
+        if (
+          !referencedVersion.demo_scoped ||
+          referencedVersion.case_id !== pending.caseId ||
+          referencedVersion.document_id !== pending.documentId
+        )
+          throw new Error("Pending object is outside the synthetic demo scope");
         carriedObjects.push(pending);
         continue;
       }
@@ -157,6 +198,8 @@ export async function resetSyntheticDemo() {
         versionId: version.id,
       });
       return [keys.available, keys.preview, keys.quarantine].map((key) => ({
+        caseId: version.case_id,
+        documentId: version.document_id,
         key,
         versionId: version.id,
       }));
