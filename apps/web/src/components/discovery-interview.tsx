@@ -69,6 +69,10 @@ function answerValue(answers: Record<string, Answer | undefined>, key: string) {
   return answer?.status === "answered" ? answer.value : undefined;
 }
 
+function hasAddressedQuestion(answer: Answer | undefined) {
+  return Boolean(answer);
+}
+
 function conditionMatches(
   condition: Condition,
   answers: Record<string, Answer | undefined>,
@@ -273,9 +277,8 @@ export function DiscoveryInterview({
         !condition || conditionMatches(condition, initialAnswers),
     );
     return (
-      applicable.find(
-        ({ key }) => !isRequiredAnswerComplete(initialAnswers[key]),
-      )?.key ?? null
+      applicable.find(({ key }) => !hasAddressedQuestion(initialAnswers[key]))
+        ?.key ?? null
     );
   });
   const [reviewing, setReviewing] = useState(false);
@@ -343,7 +346,7 @@ export function DiscoveryInterview({
       );
       const next = nextApplicable.find(
         ({ key }) =>
-          key !== question.key && !isRequiredAnswerComplete(nextAnswers[key]),
+          key !== question.key && !hasAddressedQuestion(nextAnswers[key]),
       );
       if (editingFromReview) {
         setEditingFromReview(false);
@@ -522,7 +525,7 @@ export function DiscoveryInterview({
               onClick={() => {
                 const target =
                   moduleQuestions.find(
-                    ({ key }) => !isRequiredAnswerComplete(answers[key]),
+                    ({ key }) => !hasAddressedQuestion(answers[key]),
                   ) ?? moduleQuestions[0];
                 if (target) {
                   setCurrentKey(target.key);

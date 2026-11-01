@@ -499,7 +499,7 @@ async function main() {
     }>(
       `select
          c.id as case_id,
-         count(distinct dv.id) filter (where dv.processing_status = 'available')::int as available_versions,
+         count(distinct dv.document_id) filter (where dv.processing_status = 'available')::int as available_versions,
          count(distinct pr.id)::int as reviews
        from resurgo.cases c
        join resurgo.case_memberships cm
