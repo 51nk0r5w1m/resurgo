@@ -94,7 +94,10 @@ export async function resetSyntheticDemo() {
       );
       // A prepared cleanup record may survive a rolled-back transaction. Never
       // delete an object while its immutable version row still references it.
-      if (version.rowCount) continue;
+      if (version.rowCount) {
+        retryableObjects.push(pending);
+        continue;
+      }
       try {
         await storage.delete(pending.key);
       } catch {
