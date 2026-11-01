@@ -3,22 +3,28 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
-    "dev": "next dev --hostname 127.0.0.1",
+    "assets:docxodus": "node scripts/copy-docxodus-runtime.mjs",
+    "build": "pnpm assets:docxodus && next build --webpack",
+    "dev": "pnpm assets:docxodus && next dev --hostname 127.0.0.1",
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "catalog:",
+    "@fastify/busboy": "catalog:",
     "@resurgo/config": "workspace:*",
     "@resurgo/db": "catalog:",
+    "@resurgo/documents": "catalog:",
     "@resurgo/ui": "workspace:*",
     "better-auth": "catalog:",
+    "docxodus": "catalog:",
     "lucide-react": "1.64.0",
     "next": "16.4.3",
     "nodemailer": "catalog:",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "react-docxodus-viewer": "catalog:",
+    "pdfjs-dist": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -26,7 +32,10 @@
     "@types/nodemailer": "catalog:",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "docx": "catalog:",
+    "pdf-lib": "catalog:",
     "tailwindcss": "4.3.3",
-    "typescript": "6.0.3"
+    "tsx": "catalog:",
+    "typescript": "5.9.3"
   }
 }

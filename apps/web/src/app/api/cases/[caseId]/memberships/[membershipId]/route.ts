@@ -1,4 +1,8 @@
-import { AuthorizationDeniedError, revokeCaseMembership } from "@resurgo/db";
+import {
+  acceptCaseMembership,
+  AuthorizationDeniedError,
+  revokeCaseMembership,
+} from "@resurgo/db";
 import { z } from "zod";
 
 import { recordAuthorizationDecision } from "../../../../../../lib/authorization-audit";
@@ -41,6 +45,35 @@ export async function DELETE(
       reasonCode: "case_access_denied",
       resourceId: caseId,
     });
+    return Response.json({ error: "Resource unavailable" }, { status: 404 });
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ caseId: string; membershipId: string }> },
+) {
+  const session = await getAuth().api.getSession({ headers: request.headers });
+  if (!session)
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const { caseId, membershipId } = await context.params;
+  if (
+    !z.uuid().safeParse(caseId).success ||
+    !z.uuid().safeParse(membershipId).success
+  ) {
+    return Response.json({ error: "Resource unavailable" }, { status: 404 });
+  }
+  try {
+    const membership = await acceptCaseMembership(getDatabase(), {
+      caseId,
+      membershipId,
+      userId: session.user.id,
+    });
+    return Response.json(
+      { membership: { id: membership.id, status: membership.status } },
+      { headers: { "cache-control": "no-store" } },
+    );
+  } catch {
     return Response.json({ error: "Resource unavailable" }, { status: 404 });
   }
 }

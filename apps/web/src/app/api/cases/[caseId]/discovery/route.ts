@@ -12,8 +12,11 @@ import { getAuth, getDatabase } from "../../../../../lib/auth";
 const requestBody = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("answer"),
+    answer: z.object({
+      status: z.enum(["answered", "unknown", "not_applicable", "deferred"]),
+      value: z.unknown(),
+    }),
     questionKey: z.string().min(1),
-    value: z.string().min(1),
   }),
   z.object({ action: z.literal("complete") }),
 ]);
@@ -82,10 +85,15 @@ export async function POST(
   try {
     if (parsed.data.action === "answer") {
       const saved = await saveDiscoveryAnswer(getDatabase(), {
+        answer: {
+          source: "client_reported",
+          status: parsed.data.answer.status,
+          value: parsed.data.answer.value,
+          verificationStatus: "client_confirmed",
+        },
         caseId,
         questionKey: parsed.data.questionKey,
         userId: context.session.user.id,
-        value: parsed.data.value,
       });
       return Response.json(
         { saved },

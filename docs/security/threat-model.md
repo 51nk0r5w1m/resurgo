@@ -52,17 +52,18 @@ byte as hostile.
 | Resource exhaustion                          | Per-file/request/user limits, streaming, worker CPU/memory/time limits, bounded retries and queue depth                                                  |
 | Supply-chain compromise                      | Lockfile, pinned CI actions/images, SBOM/SCA, provenance review, exact version/license inventory                                                         |
 
-## Security decisions required before document code
+## Document-processing decisions and remaining deployment gates
 
-1. Select and pin the local object store and document its encryption mode. Private
-   access alone is not evidence of encryption at rest.
-2. Select the PDF structural validator and isolation mechanism. ClamAV alone is
-   insufficient to call a preview safe.
-3. Define maximum upload size, page/object/expansion limits, scan timeout, retry
-   budget, rejection codes, and fail-closed operator recovery.
-4. Approve the action/classification/purpose matrix and owner-grant semantics.
-5. Approve audit integrity, retention, and privileged audit-reader design.
-6. Decide production key management, TLS termination, backup encryption, and
+1. Garage 2.5.0, ClamAV 1.5.4, PDF.js 6.4.299, pdf-lib 1.17.1, and ZIP.js
+   2.24.0 are pinned for C2. Private access is tested; local at-rest encryption
+   is not claimed.
+2. Uploads are capped at 15 MB by a streaming multipart parser. OOXML entry and
+   expanded-size bounds, parser checks, malware scanning, hash verification, and
+   raster-only PDF preview generation all fail closed before availability.
+3. Approve production retry/dead-letter operations and alerting for processing
+   leases that repeatedly fail because dependencies are unavailable.
+4. Approve audit integrity, retention, and privileged audit-reader design.
+5. Decide production key management, TLS termination, backup encryption, and
    restore verification. Local defaults are not production controls.
 
 Regulatory applicability remains unassessed under RES-038. This threat model does

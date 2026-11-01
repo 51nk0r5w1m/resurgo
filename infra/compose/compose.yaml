@@ -1,6 +1,67 @@
 name: resurgo
 
 services:
+  clamav:
+    image: clamav/clamav:1.5.4-debian13-slim@sha256:cce3e1a43ae2bb40e11335c52c0e1e98273b12fa3d587e617f63a6907cc4b70b
+    healthcheck:
+      test: ["CMD", "clamdscan", "--ping", "1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+    mem_limit: 2g
+    cpus: 1.0
+    pids_limit: 256
+    ports:
+      - "127.0.0.1:${CLAMAV_PORT:-3310}:3310"
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /run/clamav:size=16m,mode=0750
+      - /tmp:size=64m,mode=1777
+      - /var/lock:size=4m,mode=0755
+      - /var/log/clamav:size=16m,mode=0750
+    volumes:
+      - clamav-signatures:/var/lib/clamav
+    networks:
+      - default
+      - document-internal
+
+  document-worker:
+    build:
+      context: ../..
+      dockerfile: apps/document-worker/Dockerfile
+    depends_on:
+      clamav:
+        condition: service_healthy
+      garage:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      GARAGE_ACCESS_KEY_ID: ${GARAGE_ACCESS_KEY_ID:?Run pnpm env:init first}
+      GARAGE_BUCKET: ${GARAGE_BUCKET:?Run pnpm env:init first}
+      GARAGE_ENDPOINT: http://garage:3900
+      GARAGE_REGION: ${GARAGE_REGION:?Run pnpm env:init first}
+      GARAGE_SECRET_ACCESS_KEY: ${GARAGE_SECRET_ACCESS_KEY:?Run pnpm env:init first}
+      NODE_ENV: production
+    mem_limit: 1g
+    cpus: 1.0
+    pids_limit: 128
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    networks:
+      - document-internal
+
   mailpit:
     image: axllent/mailpit:v1.32.0@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498
     environment:
@@ -36,6 +97,9 @@ services:
       - no-new-privileges:true
     volumes:
       - postgres-data:/var/lib/postgresql/18/docker
+    networks:
+      - default
+      - document-internal
 
   garage:
     image: dxflrs/garage:v2.5.0@sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5
@@ -67,6 +131,13 @@ services:
       - ./garage.toml:/etc/garage.toml:ro
       - garage-data:/var/lib/garage/data
       - garage-meta:/var/lib/garage/meta
+    networks:
+      - default
+      - document-internal
+
+networks:
+  document-internal:
+    internal: true
 
 secrets:
   garage_admin_token:
@@ -77,6 +148,7 @@ secrets:
     file: ../../.secrets/garage_rpc_secret
 
 volumes:
+  clamav-signatures:
   garage-data:
   garage-meta:
   postgres-data:

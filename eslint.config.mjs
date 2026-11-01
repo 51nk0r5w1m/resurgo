@@ -14,6 +14,7 @@ export default defineConfig([
     "**/.next/**",
     "**/coverage/**",
     "**/dist/**",
+    "apps/web/public/docxodus/**",
     "**/node_modules/**",
     "**/playwright-report/**",
     "**/test-results/**",

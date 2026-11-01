@@ -13,8 +13,10 @@ export function createResurgoAuth(input: {
   appUrl: string;
   database: Database;
   emailSender: AuthEmailSender;
+  rateLimitEnabled?: boolean;
   secret: string;
   secureCookies: boolean;
+  trustedOrigins?: string[];
 }) {
   return betterAuth({
     appName: "Resurgo",
@@ -68,7 +70,7 @@ export function createResurgoAuth(input: {
         },
       },
     },
-    trustedOrigins: [input.appUrl],
+    trustedOrigins: input.trustedOrigins ?? [input.appUrl],
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: true,
@@ -116,7 +118,7 @@ export function createResurgoAuth(input: {
       cookieCache: { enabled: false },
     },
     rateLimit: {
-      enabled: true,
+      enabled: input.rateLimitEnabled ?? true,
       storage: "database",
       window: 60,
       max: 60,
