@@ -272,7 +272,11 @@ export function DiscoveryInterview({
       ({ condition }) =>
         !condition || conditionMatches(condition, initialAnswers),
     );
-    return applicable.find(({ key }) => !initialAnswers[key])?.key ?? null;
+    return (
+      applicable.find(
+        ({ key }) => !isRequiredAnswerComplete(initialAnswers[key]),
+      )?.key ?? null
+    );
   });
   const [reviewing, setReviewing] = useState(false);
   const [editingFromReview, setEditingFromReview] = useState(false);
@@ -332,22 +336,22 @@ export function DiscoveryInterview({
       };
       setAnswers((existing) => ({ ...existing, [question.key]: saved }));
       setMessage("Saved privately. You can return and resume at any time.");
-      if (editingFromReview) {
-        setEditingFromReview(false);
-        setCurrentKey(null);
-        setReviewing(true);
-        return;
-      }
       const nextAnswers = { ...answers, [question.key]: saved };
       const nextApplicable = questions.filter(
         ({ condition }) =>
           !condition || conditionMatches(condition, nextAnswers),
       );
-      const next =
-        nextApplicable.findIndex(({ key }) => key === question.key) + 1;
-      if (next < nextApplicable.length)
-        setCurrentKey(nextApplicable[next]!.key);
-      else {
+      const next = nextApplicable.find(
+        ({ key }) =>
+          key !== question.key && !isRequiredAnswerComplete(nextAnswers[key]),
+      );
+      if (editingFromReview) {
+        setEditingFromReview(false);
+      }
+      if (next) {
+        setCurrentKey(next.key);
+        setReviewing(false);
+      } else {
         setCurrentKey(null);
         setReviewing(true);
       }
@@ -517,8 +521,9 @@ export function DiscoveryInterview({
               key={module.key}
               onClick={() => {
                 const target =
-                  moduleQuestions.find(({ key }) => !answers[key]) ??
-                  moduleQuestions[0];
+                  moduleQuestions.find(
+                    ({ key }) => !isRequiredAnswerComplete(answers[key]),
+                  ) ?? moduleQuestions[0];
                 if (target) {
                   setCurrentKey(target.key);
                   setReviewing(false);

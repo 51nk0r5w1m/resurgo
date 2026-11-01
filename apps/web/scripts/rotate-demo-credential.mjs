@@ -13,6 +13,7 @@ const credentialsPath = resolve(
   import.meta.dirname,
   "../../../.secrets/demo-credentials.json",
 );
+const recoveryPath = `${credentialsPath}.${role}.recovery`;
 const credentials = JSON.parse(await readFile(credentialsPath, "utf8"));
 const account = credentials.accounts[role];
 if (!account) throw new Error(`No ${role} demo account is configured`);
@@ -90,12 +91,26 @@ await request("/two-factor/verify-totp", {
   trustDevice: false,
 });
 
+// Authentication with the persisted credential proves any older recovery
+// record is obsolete. Preserve it when sign-in fails so manual recovery remains
+// possible after an interrupted or ambiguous prior rotation.
+try {
+  await unlink(recoveryPath);
+} catch (error) {
+  if (
+    !error ||
+    typeof error !== "object" ||
+    !("code" in error) ||
+    error.code !== "ENOENT"
+  )
+    throw error;
+}
+
 const nextPassword = `R!${randomBytes(32).toString("base64url")}`;
 const previousPassword = account.password;
 credentials.generatedAt = new Date().toISOString();
 credentials.accounts[role].password = nextPassword;
 const temporaryPath = `${credentialsPath}.${process.pid}.tmp`;
-const recoveryPath = `${credentialsPath}.${role}.recovery`;
 await writeFile(
   recoveryPath,
   `${JSON.stringify(

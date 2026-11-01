@@ -52,7 +52,6 @@ export async function resetSyntheticDemo() {
     const userIds = users.rows.map(({ id }) => id);
     if (userIds.length === 0) {
       console.log("No synthetic demonstration records were present.");
-      return;
     }
     const cases = await database.query<{ id: string }>(
       `select distinct c.id
@@ -88,11 +87,16 @@ export async function resetSyntheticDemo() {
         documentId: version.document_id,
         versionId: version.id,
       });
-      await Promise.all([
-        storage.delete(keys.available),
-        storage.delete(keys.preview),
-        storage.delete(keys.quarantine),
-      ]);
+      const objectKeys = [keys.available, keys.preview, keys.quarantine];
+      const results = await Promise.allSettled(
+        objectKeys.map((key) => storage.delete(key)),
+      );
+      for (const [index, result] of results.entries()) {
+        if (result.status === "rejected") {
+          console.error(`Failed to delete demo object ${objectKeys[index]}`);
+          process.exitCode = 1;
+        }
+      }
     }
 
     await database.query("begin");
